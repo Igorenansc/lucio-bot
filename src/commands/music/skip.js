@@ -14,10 +14,13 @@ export async function run(client, interaction) {
     
   const edit = (isLegacy) ? 'edit' : 'editReply';
 
-  const { player, currentTrack } = store.getState();
-
-  if (player) await player.stop();
+  const { queue } = await store.getState();
   
-  if (!currentTrack) return ((isLegacy) ? reply : interaction)[edit]('Não há múscias tocando no momento.');
-  return ((isLegacy) ? reply : interaction)[edit]({ content: `A música **${currentTrack[0].title}** foi pulada!` });
+  if (!queue) return ((isLegacy) ? reply : interaction)[edit]('Não há músicas tocando no momento.')
+
+  const currentTrack = queue.current;
+  queue.skip();
+  
+  if (!currentTrack) return ((isLegacy) ? reply : interaction)[edit]('Não há músicas tocando no momento.');
+  return ((isLegacy) ? reply : interaction)[edit]({ content: `A música **${currentTrack.title}** foi pulada!` });
 }

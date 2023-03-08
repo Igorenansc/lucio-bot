@@ -19,6 +19,30 @@ client.owners = JSON.parse(process.env.OWNERS);
 
 client.on('ready', () => console.log("I'm Alive"));
 
+client.player = new Player(client, {
+  ytdlOptions: {
+    quality: "highestaudio",
+    highWaterMark: 1 << 25,
+  }
+});
+
+// Disconnect bug fix by vittee
+// https://github.com/discordjs/discord.js/issues/9185#issuecomment-1452510633
+client.player.on('connectionCreate', (queue) => {
+  queue.connection.voiceConnection.on('stateChange', (oldState, newState) => {
+    const oldNetworking = Reflect.get(oldState, 'networking');
+    const newNetworking = Reflect.get(newState, 'networking');
+
+    const networkStateChangeHandler = (oldNetworkState, newNetworkState) => {
+      const newUdp = Reflect.get(newNetworkState, 'udp');
+      clearInterval(newUdp?.keepAliveInterval);
+    }
+
+    oldNetworking?.off('stateChange', networkStateChangeHandler);
+    newNetworking?.on('stateChange', networkStateChangeHandler);
+  });
+});
+
 // Event Handler
 readdirSync(join(__dirname, "./events")).forEach(async file => {
   const eventName = file.split('.')[0];
@@ -39,12 +63,5 @@ client.categories.forEach(category => {
     client.commands.set(cmd.data.name, cmd)
   })
 })
-
-client.player = new Player(client, {
-  ytdlOptions: {
-    quality: "highestaudio",
-    highWaterMark: 1 << 25,
-  }
-});
 
 client.login(process.env.TOKEN);

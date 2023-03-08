@@ -13,16 +13,14 @@ export async function run(client, interaction) {
     : await interaction.deferReply({ ephemeral: false, fetchReply: true });
     
   const edit = (isLegacy) ? 'edit' : 'editReply';
+
+  const { queue } = await store.getState();
+
+  if (!queue) return ((isLegacy) ? reply : interaction)[edit]('Não há música tocando no momento.')
+
+  queue.destroy();
+
+  await store.dispatch({ type: 'DESTROY_QUEUE' });
   
-  const { connection, player } = store.getState();
-
-  // await interaction.guild.members.me.voice.disconnect();
-
-  if (player) player.stop();
-  if (!connection) return ((isLegacy) ? reply : interaction)[edit]({ content: "Sem conexão ativa no momento." });
-
-  connection.destroy();
-  await store.dispatch({ type: 'STOP_PLAYLIST' });
-
   return ((isLegacy) ? reply : interaction)[edit]({ content: "A fila foi limpa e o bot removido!" });
 }
