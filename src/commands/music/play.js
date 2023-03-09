@@ -23,8 +23,6 @@ export const data = {
   ],
 };
 export async function run(client, interaction) {
-  if (!client.owners.includes(interaction.member.id)) return interaction.reply({ content: `Você não tem permissão para usar esse comando.` });
-
   const isLegacy = !interaction?.options
   const reply = (isLegacy) 
     ? await interaction.reply({ content: 'Lúcio está pensando...'})
