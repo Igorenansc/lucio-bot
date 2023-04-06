@@ -16,30 +16,31 @@ export const prefix = '!!';
 client.commands = new Collection();
 client.categories = readdirSync(join(__dirname, './commands'));
 client.owners = JSON.parse(process.env.OWNERS);
+console.log(JSON.parse(process.env.OWNERS))
 
 client.on('ready', () => console.log("I'm Alive"));
 
-client.player = new Player(client, {
+const player = new Player(client, {
   ytdlOptions: {
     quality: "highestaudio",
     highWaterMark: 1 << 25,
   }
-});
+})
 
-// Disconnect bug fix by vittee
-// https://github.com/discordjs/discord.js/issues/9185#issuecomment-1452510633
-client.player.on('connectionCreate', (queue) => {
+// client.player.on('trackEnd', (queue) => {
+//   queue.previousTracks = [];
+// });
+
+// Disconnect bug fix by ramsydx
+// https://github.com/discordjs/discord.js/issues/9185#issuecomment-1459083216
+const networkStateChangeHandler = (oldNetworkState, newNetworkState) => {
+  const newUdp = Reflect.get(newNetworkState, 'udp');
+  clearInterval(newUdp?.keepAliveInterval);
+}
+player.events.on('connectionCreate', (queue) => {
   queue.connection.voiceConnection.on('stateChange', (oldState, newState) => {
-    const oldNetworking = Reflect.get(oldState, 'networking');
-    const newNetworking = Reflect.get(newState, 'networking');
-
-    const networkStateChangeHandler = (oldNetworkState, newNetworkState) => {
-      const newUdp = Reflect.get(newNetworkState, 'udp');
-      clearInterval(newUdp?.keepAliveInterval);
-    }
-
-    oldNetworking?.off('stateChange', networkStateChangeHandler);
-    newNetworking?.on('stateChange', networkStateChangeHandler);
+    Reflect.get(oldState, 'networking')?.off('stateChange', networkStateChangeHandler);
+    Reflect.get(newState, 'networking')?.on('stateChange', networkStateChangeHandler);
   });
 });
 

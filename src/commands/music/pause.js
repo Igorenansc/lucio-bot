@@ -1,8 +1,8 @@
-import store from "../../redux/store.js";
+import { useMasterPlayer } from "discord-player";
 
 export const data = {
   name: "pause",
-  description: "Pausa a música tocando atualmente",
+  description: "Pausa/retoma a música tocando atualmente",
   options: [],
 };
 
@@ -13,14 +13,17 @@ export async function run(client, interaction) {
     : await interaction.deferReply({ ephemeral: false, fetchReply: true });
     
   const edit = (isLegacy) ? 'edit' : 'editReply';
-
-  const { queue, isPaused } = await store.getState();
+  
+  const player = useMasterPlayer();
+  const queue = player.nodes.get(interaction.guild);
 
   if (!queue) return ((isLegacy) ? reply : interaction)[edit]('Não há música tocando no momento.')
 
-  queue.setPaused(!isPaused);
-  
-  await store.dispatch({ type: 'TOGGLE_PAUSE' });
-  
-  return ((isLegacy) ? reply : interaction)[edit]({ content: `Música ${(isPaused) ? 'retomada' : 'pausada'}!` });
+  if (!queue.node.isPaused()) {
+    queue.node.pause();
+  } else {
+    queue.node.resume();
+  }
+
+  return ((isLegacy) ? reply : interaction)[edit]({ content: (queue.node.isPaused()) ? 'Música pausada!' : 'Música retomada!' });
 }

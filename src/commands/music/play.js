@@ -1,13 +1,17 @@
-import { QueryType } from "discord-player";
-import store from "../../redux/store.js";
+import { QueryType, useMasterPlayer } from "discord-player";
 
 const queryType = (string) => {
   const urlRegex = /^(?:(?:https?):\/\/)?[\w/\-?=%.]+\.[\w/\-?=%&.]+$/
 
   // Entra no if caso seja uma url
-  if (urlRegex.test(string)) return (string.includes("youtube.com/playlist")) ? 'PLAYLIST' : 'VIDEO'
+  if (string.includes('open.spotify.com')) {
+    const suffix = string.split('open.spotify.com')[1].split('/')[1].toUpperCase();
 
-  return 'SEARCH'
+    return `SPOTIFY_${(suffix === 'TRACK') ? 'SONG' : suffix }`
+  }
+  if (urlRegex.test(string)) return (string.includes("youtube.com/playlist")) ? 'YOUTUBE_PLAYLIST' : 'YOUTUBE_VIDEO'
+
+  return 'YOUTUBE_SEARCH'
 };
 
 export const data = {
@@ -31,7 +35,8 @@ export async function run(client, interaction) {
   const edit = (isLegacy) ? 'edit' : 'editReply';
 
   let voiceChannel;
-  
+  const player = useMasterPlayer();
+
   try {
     voiceChannel = interaction.member.voice.channel;
     const permissions = voiceChannel.permissionsFor(interaction.client.user);
@@ -46,45 +51,51 @@ export async function run(client, interaction) {
   }
   
   try {
-    const query = (interaction.options)
-      ? interaction.options.getString("busca", true)
-      : interaction.content.slice(3).trim();
-    
-    const { player: storedQueue } = store.getState();
+    const query = (isLegacy)
+      ? interaction.content.slice(3).trim()
+      : interaction.options.getString("busca", true);
 
-    const queue = (!storedQueue) ? await client.player.createQueue(interaction.guild, {
-      autoSelfDeaf: true,
+      const queue = player.nodes.create(interaction.guild, {
+      metadata: {
+        channel: interaction.channel,
+        client: interaction.guild.members.me,
+        requestedBy: interaction.user,
+      },
+      selfDeaf: true,
       leaveOnEmpty: true,
-      leaveOnEmptyCooldown: 300000,
+      leaveOnEmptyCooldown: 10000,
       leaveOnEnd: true,
-      leaveOnEndCooldown: 300000,
-    }) : player;
-    // const queue = await client.player.createQueue(interaction.guild);
-    
-    if (!storedQueue) {
-      store.dispatch({ type: 'SET_QUEUE', payload: queue });
-    }
+      leaveOnEndCooldown: 3000000,
+    });
+    // const queue = await client.player.createQueue(interaction.guild, {
+    //   autoSelfDeaf: true,
+    //   leaveOnEmpty: true,
+    //   leaveOnEmptyCooldown: 10000,
+    //   leaveOnEnd: true,
+    //   leaveOnEndCooldown: 300000,
+    // });
     
     if (!queue.connection) await queue.connect(voiceChannel);
     
+    const listTypes = ['YOUTUBE_PLAYLIST', 'SPOTIFY_ALBUM', 'SPOTIFY_PLAYLIST'];
     const type = queryType(query);
-    const result = await client.player.search(query, {
+    const result = await player.search(query, {
       requestedBy: interaction.member,
-      searchEngine: QueryType[`YOUTUBE_${type}`],
+      searchEngine: QueryType[type],
     });
 
-    if (result.tracks.length === 0) return ((isLegacy) ? reply : interaction)[edit]({ content: 'Não obtive resultados.' });
+    if (!result.hasTracks()) return ((isLegacy) ? reply : interaction)[edit]({ content: 'Não obtive resultados.' });
 
-    const song = (type === 'PLAYLIST') ? result.tracks : result.tracks[0];
-    await queue[(type === 'PLAYLIST') ? 'addTracks' : 'addTrack'](song);
+    const song = (listTypes.includes(type)) ? result.tracks : result.tracks[0];
+    queue.addTrack(song);
     
-    if (!queue.playing) await queue.play();
+    if (!queue.node.isPlaying()) await queue.node.play();
     
-    const message = { content: `${(type === 'PLAYLIST') ? `Uma playlist com **${song.length}** músicas foi` : `**${song.title} - [${song.duration}]**` } adicionada!` };
+    const message = { content: `${(listTypes.includes(type)) ? `Uma playlist com **${song.length}** músicas foi` : `**${song.title} - [${song.duration}]**` } adicionada!` };
     return ((isLegacy) ? reply : interaction)[edit](message);
     
     } catch (e) {
-    console.log(e.message);
+    console.log(e);
     return ((isLegacy) ? reply : interaction)[edit]({ content: 'Algo deu errado!' });
   }
 }

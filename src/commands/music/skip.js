@@ -1,4 +1,4 @@
-import store from "../../redux/store.js";
+import { useMasterPlayer } from "discord-player";
 
 export const data = {
   name: "skip",
@@ -14,12 +14,13 @@ export async function run(client, interaction) {
     
   const edit = (isLegacy) ? 'edit' : 'editReply';
 
-  const { queue } = await store.getState();
+  const player = useMasterPlayer();
+  const queue = player.nodes.get(interaction.guild);
   
-  if (!queue) return ((isLegacy) ? reply : interaction)[edit]('Não há músicas tocando no momento.')
+  if (!queue || !queue.node.isPlaying) return ((isLegacy) ? reply : interaction)[edit]('Não há músicas tocando no momento.')
 
-  const currentTrack = queue.current;
-  queue.skip();
+  const { currentTrack } = queue;
+  queue.node.skip();
   
   if (!currentTrack) return ((isLegacy) ? reply : interaction)[edit]('Não há músicas tocando no momento.');
   return ((isLegacy) ? reply : interaction)[edit]({ content: `A música **${currentTrack.title}** foi pulada!` });
