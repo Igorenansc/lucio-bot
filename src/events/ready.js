@@ -1,5 +1,5 @@
 export default (client) => {
-  console.log('Client is up')
+  console.log("I'm alive")
 
-  client.application.commands.set([...client.commands.map(v => v.data)])
+  client.application.commands.set([...client.commands.map((command) => command.data)])
 }

@@ -18,7 +18,7 @@ export async function run(client, interaction) {
   const player = useMasterPlayer();
   const queue = player.nodes.get(interaction.guild);
 
-  if (!queue || !queue.node.isPlaying) return ((isLegacy) ? reply : interaction)[edit]('Não há música tocando no momento.')
+  if (!queue || !queue.currentTrack || !queue.node.isPlaying) return ((isLegacy) ? reply : interaction)[edit]('Não há música tocando no momento.')
   
   try {
     const queueStr = queue.tracks.data.slice(0, 10).map((music, i) => {
@@ -27,6 +27,8 @@ export async function run(client, interaction) {
     const { currentTrack } = queue;
     const tracksQueue = `${queueStr} ${((queue.tracks.data.length - 10) > 0) ? `\n e mais ${queue.tracks.data.length - 10}...` : ''}`
 
+    // if (queue.getSize() < 1) return ((isLegacy) ? reply : interaction)[edit]('Não há músicas tocando no momento!');
+    
     const QueueRepeatMode = {
       0: 'OFF',
       1: 'TRACK',

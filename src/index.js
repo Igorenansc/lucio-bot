@@ -18,8 +18,6 @@ client.categories = readdirSync(join(__dirname, './commands'));
 client.owners = JSON.parse(process.env.OWNERS);
 console.log(JSON.parse(process.env.OWNERS))
 
-client.on('ready', () => console.log("I'm Alive"));
-
 const player = new Player(client, {
   ytdlOptions: {
     quality: "highestaudio",
@@ -31,18 +29,26 @@ const player = new Player(client, {
 //   queue.previousTracks = [];
 // });
 
+// player.events.on('playerError', (queue, _error, track) => {
+//   console.log(`${track.title} could not be played.`);
+//   const autoplaying = queue.repeatMode === 3;
+//   if (!autoplaying) queue.setRepeatMode('AUTOPLAY')
+//   queue.node.skip();
+//   if (!autoplaying) queue.setRepeatMode('OFF')
+// })
+
 // Disconnect bug fix by ramsydx
 // https://github.com/discordjs/discord.js/issues/9185#issuecomment-1459083216
-const networkStateChangeHandler = (oldNetworkState, newNetworkState) => {
-  const newUdp = Reflect.get(newNetworkState, 'udp');
-  clearInterval(newUdp?.keepAliveInterval);
-}
-player.events.on('connectionCreate', (queue) => {
-  queue.connection.voiceConnection.on('stateChange', (oldState, newState) => {
-    Reflect.get(oldState, 'networking')?.off('stateChange', networkStateChangeHandler);
-    Reflect.get(newState, 'networking')?.on('stateChange', networkStateChangeHandler);
-  });
-});
+// const networkStateChangeHandler = (oldNetworkState, newNetworkState) => {
+//   const newUdp = Reflect.get(newNetworkState, 'udp');
+//   clearInterval(newUdp?.keepAliveInterval);
+// }
+// player.events.on('connectionCreate', (queue) => {
+//   queue.connection.voiceConnection.on('stateChange', (oldState, newState) => {
+//     Reflect.get(oldState, 'networking')?.off('stateChange', networkStateChangeHandler);
+//     Reflect.get(newState, 'networking')?.on('stateChange', networkStateChangeHandler);
+//   });
+// });
 
 // Event Handler
 readdirSync(join(__dirname, "./events")).forEach(async file => {

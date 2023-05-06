@@ -1,4 +1,6 @@
 import { QueryType, useMasterPlayer } from "discord-player";
+import 'ffmpeg';
+import 'ffmpeg-static';
 
 const queryType = (string) => {
   const urlRegex = /^(?:(?:https?):\/\/)?[\w/\-?=%.]+\.[\w/\-?=%&.]+$/

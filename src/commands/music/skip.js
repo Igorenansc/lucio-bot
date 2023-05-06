@@ -1,4 +1,6 @@
 import { useMasterPlayer } from "discord-player";
+import 'ffmpeg';
+import 'ffmpeg-static';
 
 export const data = {
   name: "skip",
