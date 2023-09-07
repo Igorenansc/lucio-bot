@@ -18,7 +18,7 @@ export const data = {
 };
 export async function run(client, interaction, args) {
   console.log(interaction.member?.permissions.has("Administrator"));
-  if (interaction.member?.permissions.has("Administrator")) {
+  if (interaction.member?.permissions.has("Administrator") || client.owners.includes(interaction.member.id)) {
     try {
       const commands = [];
       const commandsPath = resolve(__dirname, '../');

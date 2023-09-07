@@ -1,5 +1,5 @@
-import { useMasterPlayer } from "discord-player";
-import { EmbedBuilder } from "discord.js";
+import { useMainPlayer } from "discord-player";
+import queueMessage from "../../utils/queueMessage.js";
 
 export const data = {
   name: "q",
@@ -15,42 +15,13 @@ export async function run(client, interaction) {
     
   const edit = (isLegacy) ? 'edit' : 'editReply';
 
-  const player = useMasterPlayer();
+  const player = useMainPlayer();
   const queue = player.nodes.get(interaction.guild);
 
   if (!queue || !queue.currentTrack || !queue.node.isPlaying) return ((isLegacy) ? reply : interaction)[edit]('Não há música tocando no momento.')
   
   try {
-    const queueStr = queue.tracks.data.slice(0, 10).map((music, i) => {
-      return `**${i + 1} - ** ${music.title} - ${music.duration}`;
-    }).join('\n');
-    const { currentTrack } = queue;
-    const tracksQueue = `${queueStr} ${((queue.tracks.data.length - 10) > 0) ? `\n e mais ${queue.tracks.data.length - 10}...` : ''}`
-
-    // if (queue.getSize() < 1) return ((isLegacy) ? reply : interaction)[edit]('Não há músicas tocando no momento!');
-    
-    const QueueRepeatMode = {
-      0: 'OFF',
-      1: 'TRACK',
-      2: 'QUEUE',
-      3: 'AUTOPLAY',
-    }
-
-    const response = new EmbedBuilder()
-      .setColor('Green')
-      .setTimestamp()
-      .addFields(
-        {
-          name: ":musical_note: Tocando Agora",
-          value: `${queue.currentTrack.title}\n${queue.node.createProgressBar()}\n`,
-          inline: true,
-        },
-        {
-          name: ":notes: Queue",
-          value: tracksQueue,
-          inline: false,
-        }
-      )
+    const response = queueMessage(queue);
 
     return ((isLegacy) ? reply : interaction)[edit]({ embeds: [response] });
   } catch (e) {

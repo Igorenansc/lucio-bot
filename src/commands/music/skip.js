@@ -1,6 +1,4 @@
-import { useMasterPlayer } from "discord-player";
-import 'ffmpeg';
-import 'ffmpeg-static';
+import { useMainPlayer } from "discord-player";
 
 export const data = {
   name: "skip",
@@ -12,11 +10,11 @@ export async function run(client, interaction) {
   const isLegacy = !interaction?.options;
   const reply = (isLegacy) 
     ? await interaction.reply({ content: 'Lúcio está pensando...'})
-    : await interaction.deferReply({ ephemeral: false, fetchReply: true });
+    : await interaction.deferReply({ ephemeral: true, fetchReply: true });
     
   const edit = (isLegacy) ? 'edit' : 'editReply';
 
-  const player = useMasterPlayer();
+  const player = useMainPlayer();
   const queue = player.nodes.get(interaction.guild);
   
   if (!queue || !queue.node.isPlaying) return ((isLegacy) ? reply : interaction)[edit]('Não há músicas tocando no momento.')

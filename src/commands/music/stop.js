@@ -1,4 +1,5 @@
-import { useMasterPlayer } from "discord-player";
+import { useMainPlayer } from "discord-player";
+import playerMessage from "../../utils/playerMessage.js";
 
 export const data = {
   name: "stop",
@@ -14,11 +15,12 @@ export async function run(client, interaction) {
 
   const edit = (isLegacy) ? 'edit' : 'editReply';
 
-  const player = useMasterPlayer();
+  const player = useMainPlayer();
   const queue  = player.nodes.get(interaction.guild);
 
   if (!queue || !queue.node.isPlaying) return ((isLegacy) ? reply : interaction)[edit]('Não há músicas tocando no momento.')
 
+  playerMessage.delete(queue);
   queue.delete();
 
   return ((isLegacy) ? reply : interaction)[edit]({ content: "A fila foi limpa e o bot removido!" });

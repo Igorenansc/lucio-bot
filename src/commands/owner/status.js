@@ -22,8 +22,8 @@ export async function run(client, interaction) {
     } else
       client.user.setActivity();
 
-    interaction.reply({ content: `Status alterado para: ${option}` });
+    interaction.reply({ content: `Status alterado para: ${option}`, ephemeral: true });
   } catch (e) {
-    interaction.reply({ content: 'Ocorreu um erro ao executar o commando' });
+    interaction.reply({ content: 'Ocorreu um erro ao executar o commando', ephemeral: true });
   }
 }
