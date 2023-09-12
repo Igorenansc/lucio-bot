@@ -1,11 +1,15 @@
 import { QueryType, QueueRepeatMode, useMainPlayer } from "discord-player";
-import "ffmpeg";
-import "ffmpeg-static";
+import fetch from "isomorphic-unfetch";
 
-const queryType = (string) => {
+const parseQuery = async (string) => {
+  let query = string;
+  if (query.includes("spotify.link")) query = (await fetch(query)).url;
+  return query;
+}
+
+const queryType = async (string) => {
   const urlRegex = /^(?:(?:https?):\/\/)?[\w/\-?=%.]+\.[\w/\-?=%&.]+$/
 
-  // Entra no if caso seja uma url
   if (string.includes("open.spotify.com")) {
     const suffix = string.split("open.spotify.com")[1].split("/")[1].toUpperCase();
 
@@ -53,7 +57,7 @@ export async function run(client, interaction) {
   }
   
   try {
-    const query = (isLegacy)
+    let query = (isLegacy)
       ? interaction.content.slice(3).trim()
       : interaction.options.getString("busca", true);
     const nodeAlreadyCreated = player.nodes.has(interaction.guild.id);
@@ -86,7 +90,8 @@ export async function run(client, interaction) {
       }
 
     const listTypes = ["YOUTUBE_PLAYLIST", "SPOTIFY_ALBUM", "SPOTIFY_PLAYLIST"];
-    const type = queryType(query);
+    query = await parseQuery(query);
+    const type = await queryType(query);
     const result = await player.search(query, {
       requestedBy: interaction.member || interaction.member.me,
       searchEngine: QueryType[type],
@@ -97,7 +102,7 @@ export async function run(client, interaction) {
     const song = (listTypes.includes(type)) ? result.tracks : result.tracks[0];
     queue.addTrack(song);
 
-    if (!queue.node.isPlaying() && !queue.node.isPaused()) queue.node.setPaused(false);
+    if (!queue.node.isPlaying() && !queue.node.isPaused()) queue.node.play();
 
     const message = { 
       content: `${(listTypes.includes(type)) ? `A playlist **${song[0].playlist.title}** com **${song.length}** músicas foi` : `**${song.title} - [${song.duration}]**` } adicionada!`

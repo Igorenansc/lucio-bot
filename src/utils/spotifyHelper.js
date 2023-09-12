@@ -37,13 +37,11 @@ const search = async (query, type = "track") => {
     const responseTypes = {
       track: "tracks",
       album: "albums",
-      artist: "artists",
-      playlist: "playlists",
-      episode: "episodes",
+      playlist: "playlists"
     }
     
     return data[responseTypes[type]].items.map((item) => ({
-      title: (type === "album") ? item.name + " - " + item.artists.map((a) => a.name).join(", ") : item.name,
+      title: (type !== "playlist") ? item.name + " - " + item.artists.map((a) => a.name).join(", ") : item.name,
       url: item.external_urls?.spotify || `https://open.spotify.com/${type}/${m.id}`,
     }));
   } catch (e) {
