@@ -1,9 +1,9 @@
-import { REST } from '@discordjs/rest';
-import { Routes } from 'discord.js';
-import { config } from 'dotenv';
-import { readdirSync } from 'fs';
-import path, { resolve } from 'path';
-import { fileURLToPath } from 'url';
+import { REST } from "@discordjs/rest";
+import { Routes } from "discord.js";
+import { config } from "dotenv";
+import { readdirSync } from "fs";
+import path, { resolve } from "path";
+import { fileURLToPath } from "url";
 
 config();
 
@@ -18,10 +18,10 @@ export const data = {
 };
 export async function run(client, interaction, args) {
   console.log(interaction.member?.permissions.has("Administrator"));
-  if (interaction.member?.permissions.has("Administrator")) {
+  if (interaction.member?.permissions.has("Administrator") || client.owners.includes(interaction.member.id)) {
     try {
       const commands = [];
-      const commandsPath = resolve(__dirname, '../');
+      const commandsPath = resolve(__dirname, "../");
       const commandFolders = readdirSync(commandsPath).filter(folder => folder !== "owner");
 
       for (const folder of commandFolders) {
@@ -31,7 +31,7 @@ export async function run(client, interaction, args) {
           const command = await import(resolve(__dirname, `${commandsPath}/${folder}/${file}`));
           // const command = await import(path.resolve(__dirname, `${commandsPath}/${folder}/${file}`));
 
-          if (command?.data && command?.data?.name !== 'sync') {
+          if (command?.data && command?.data?.name !== "sync") {
             console.log(command.data.name);
             commands.push(command.data);
           }
@@ -46,7 +46,7 @@ export async function run(client, interaction, args) {
       interaction.reply("Comandos registrados com sucesso!");
     } catch (e) {
       console.error(e);
-      interaction.reply('Houve um erro ao registrar os comandos da aplicação.');
+      interaction.reply("Houve um erro ao registrar os comandos da aplicação.");
     }
   } else {
     interaction.reply("Você não tem permissão para usar esse comando.");
