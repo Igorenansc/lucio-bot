@@ -5,7 +5,7 @@ export const data = {
   description: "Pula a música tocando atualmente",
   options: [
     {
-      name: "quantidade",
+      name: "qtd",
       description: "Numero de músicas a serem puladas.",
       required: false,
       min_value: 1,
@@ -14,7 +14,7 @@ export const data = {
   ],
 };
 
-export async function run(client, interaction) {
+export async function run(_client, interaction) {
   const isLegacy = !interaction?.options;
   const reply = (isLegacy) 
     ? await interaction.reply({ content: "Lúcio está pensando..."})

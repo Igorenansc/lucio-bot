@@ -97,7 +97,7 @@ export async function run(client, interaction) {
     const song = (listTypes.includes(type)) ? result.tracks : result.tracks[0];
     queue.addTrack(song);
 
-    if (!queue.node.isPlaying() && !queue.node.isPaused()) queue.node.play();
+    if (!queue.node.isPlaying() && !queue.node.isPaused()) queue.node.setPaused(false);
 
     const message = { 
       content: `${(listTypes.includes(type)) ? `A playlist **${song[0].playlist.title}** com **${song.length}** músicas foi` : `**${song.title} - [${song.duration}]**` } adicionada!`
