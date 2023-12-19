@@ -40,9 +40,9 @@ export const autocomplete = async (interaction) => {
   const type = interaction.options.get("tipo").value;
 
   const choices = await search(focusedValue, type);
- 
+
   const emoji = (type === "track") ? "🎵" : "🎶";
-  
+
   await interaction.respond(choices.map(({ title, url }) => ({ name: `${emoji} ${title}`.slice(0, 99), value: url })));
 };
 

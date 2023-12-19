@@ -22,31 +22,32 @@ const createPlayerMessage = async (queue, track) => {
     style: 1,
   }
 
+  // that crazyness of characters on the labels are to make the buttons larger using invisible characters and spaces
   const volumeUpButton = {
     type: 2,
     custom_id: "music_volume_up",
-    label: "Vol +",
+    label: "‎ ‎Vol +‎ ‎",
     style: 3,
   };
 
   const volumeDown = {
     type: 2,
     custom_id: "music_volume_down",
-    label: "Vol -",
+    label: "‎ Vol -‎ ",
     style: 3,
   };
 
   const refreshButton = {
     type: 2,
     custom_id: "music_refresh",
-    label: " ↻ ",
+    label: "‎ ‎ ‎ ‎ ↻‎ ‎ ‎ ‎ ",
     style: 2,
   };
 
   const queueButton = {
     type: 2,
     custom_id: "music_queue",
-    label: " 🖥 ",
+    label: "‎ ‎ ‎ 🖥‎ ‎ ‎ ",
     style: 2,
   };
 
@@ -76,7 +77,7 @@ const createPlayerMessage = async (queue, track) => {
   };
 
   try {
-    if (isFirstInteraction) {      
+    if (isFirstInteraction) {
       const message = await channel.send({ embeds: [playing], components: [actionRow1, actionRow2] });
       queue.metadata.message = message;
       queue.metadata.isFirstInteraction = false;
@@ -92,10 +93,10 @@ const deletePlayerMessage = async (queue) => {
   const { metadata: { message } } = queue;
   try {
     await message.delete();
+    queue.metadata.isFirstInteraction = true;
   } catch {
     console.log("Already deleted");
   }
-  queue.metadata.isFirstInteraction = true;
 }
 
 const playerMessage = { create: createPlayerMessage, delete: deletePlayerMessage };

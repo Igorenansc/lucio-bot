@@ -40,12 +40,12 @@ export const autocomplete = async (interaction) => {
     video: "watch?v=",
     playlist: "playlist?list="
   }
-  
+
   const choices = (await client.search(focusedValue, { type })).items;
-  
+
   const emoji = (type === "video") ? "🎵" : "🎶";
   const url = `https://www.youtube.com/${searchType[type]}`;
-  
+
   await interaction.respond(choices.map(({ title, id }) => ({ name: `${emoji} ${title}`.slice(0, 99), value: `${url}${id}` })));
 };
 

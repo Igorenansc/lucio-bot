@@ -43,7 +43,11 @@ player.events.on("disconnect", playerMessage.delete);
 
 player.events.on("playerError", async (queue, error, track) => {
   await playerMessage.delete(queue);
-  console.log(error.message);
+  console.log(`
+    playerError: ${error.message}
+    track: ${track.title}
+    `
+    );
 });
 
 // Disconnect bug fix by ramsydx
@@ -63,7 +67,7 @@ player.events.on("playerError", async (queue, error, track) => {
 readdirSync(join(__dirname, "./events")).forEach(async file => {
   const eventName = file.split(".")[0];
   const event = (await import(`./events/${file}`)).default;
-  
+
   if (event) {
     client.on(eventName, (...args) => event(client, ...args))
   }

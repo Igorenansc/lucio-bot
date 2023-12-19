@@ -16,10 +16,10 @@ export const data = {
 
 export async function run(_client, interaction) {
   const isLegacy = !interaction?.options;
-  const reply = (isLegacy) 
+  const reply = (isLegacy)
     ? await interaction.reply({ content: "Lúcio está pensando..."})
-    : await interaction.deferReply({ ephemeral: true, fetchReply: true });
-    
+    : await interaction.deferReply({ ephemeral: false, fetchReply: true });
+
   const edit = (isLegacy) ? "edit" : "editReply";
 
   const player = useMainPlayer();
@@ -28,7 +28,7 @@ export async function run(_client, interaction) {
 
   try {
     if (interaction.member.voice.channel.id !== queue.channel.id) {
-      return ((isLegacy) ? reply : interaction)[edit]({ 
+      return ((isLegacy) ? reply : interaction)[edit]({
         content: "Você precisa estar no mesmo canal de voz que eu."
       });
     }
@@ -39,7 +39,7 @@ export async function run(_client, interaction) {
 
   let amount = (isLegacy)
     ? Number(interaction.content.slice(6).trim())
-    : Number(interaction.options.get("quantidade")?.value);
+    : Number(interaction.options.get("qtd")?.value);
 
   amount = (typeof amount === "number" && amount >= 1 && queue.tracks.data.length >= amount) ? amount - 1 : 0;
 
@@ -47,5 +47,9 @@ export async function run(_client, interaction) {
   queue.node.skipTo(amount);
 
   if (!currentTrack) return ((isLegacy) ? reply : interaction)[edit]("Não há músicas tocando no momento.");
-  return ((isLegacy) ? reply : interaction)[edit]({ content: `A música **${currentTrack.title}** foi pulada!` });
+  return ((isLegacy) ? reply : interaction)[edit]({
+    content: (!amount) ? `A música **${currentTrack.title}** foi pulada!`
+    : `**${amount + 1}** músicas foram puladas!`
+  });
+  // return ((isLegacy) ? reply : interaction)[edit]({ content: `A música **${currentTrack.title}** foi pulada!` });
 }

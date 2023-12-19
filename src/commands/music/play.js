@@ -4,6 +4,11 @@ import fetch from "isomorphic-unfetch";
 const parseQuery = async (string) => {
   let query = string;
   if (query.includes("spotify.link")) query = (await fetch(query)).url;
+  if (query.includes("youtu.be")) {
+    let aux = query.split('/');
+    aux = aux[aux.length - 1];
+    return `https://www.youtube.com/watch?v=${aux.includes('?') ? aux.split('?')[0] : aux}`;
+  }
   return query;
 }
 
@@ -34,10 +39,10 @@ export const data = {
 };
 export async function run(client, interaction) {
   const isLegacy = !interaction?.options
-  const reply = (isLegacy) 
+  const reply = (isLegacy)
     ? await interaction.reply({ content: "Lúcio está pensando..."})
     : await interaction.deferReply({ ephemeral: false, fetchReply: true });
-    
+
   const edit = (isLegacy) ? "edit" : "editReply";
 
   let voiceChannel;
@@ -47,7 +52,7 @@ export async function run(client, interaction) {
     voiceChannel = interaction.member.voice.channel;
     const permissions = voiceChannel.permissionsFor(interaction.client.user);
     if (!permissions.has("Speak") || !permissions.has("Connect")) {
-      return ((isLegacy) ? reply : interaction)[edit]({ 
+      return ((isLegacy) ? reply : interaction)[edit]({
         content: "Eu não possuo permissão para entrar ou falar."
       });
     }
@@ -55,14 +60,14 @@ export async function run(client, interaction) {
     console.log(e.message);
     return ((isLegacy) ? reply : interaction)[edit]({ content: "Você precisa estar conectado a um chat de voz!" });
   }
-  
+
   try {
     let query = (isLegacy)
       ? interaction.content.slice(3).trim()
       : interaction.options.getString("busca", true);
     const nodeAlreadyCreated = player.nodes.has(interaction.guild.id);
-    const queue = (nodeAlreadyCreated) 
-      ? player.nodes.get(interaction.guild.id) 
+    const queue = (nodeAlreadyCreated)
+      ? player.nodes.get(interaction.guild.id)
       : player.nodes.create(interaction.guild, {
         metadata: {
           channel: interaction.channel,
@@ -82,7 +87,7 @@ export async function run(client, interaction) {
       if (!queue.connection) await queue.connect(voiceChannel);
       if (nodeAlreadyCreated) {
         if (voiceChannel.id !== queue.channel.id) {
-          return ((isLegacy) ? reply : interaction)[edit]({ 
+          return ((isLegacy) ? reply : interaction)[edit]({
             content: "Você precisa estar no mesmo canal de voz que eu."
           });
         }
@@ -104,7 +109,7 @@ export async function run(client, interaction) {
 
     if (!queue.node.isPlaying() && !queue.node.isPaused()) queue.node.play();
 
-    const message = { 
+    const message = {
       content: `${(listTypes.includes(type)) ? `A playlist **${song[0].playlist.title}** com **${song.length}** músicas foi` : `**${song.title} - [${song.duration}]**` } adicionada!`
     };
     return ((isLegacy) ? reply : interaction)[edit](message);

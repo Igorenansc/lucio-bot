@@ -8,7 +8,7 @@ export const data = {
 
 export async function run(client, interaction) {
   const isLegacy = !interaction?.options;
-  const reply = (isLegacy) 
+  const reply = (isLegacy)
     ? await interaction.reply({ content: "Lúcio está pensando..."})
     : await interaction.deferReply({ ephemeral: true, fetchReply: true });
 
@@ -20,7 +20,7 @@ export async function run(client, interaction) {
 
   try {
     if (interaction.member.voice.channel.id !== queue.channel.id) {
-      return ((isLegacy) ? reply : interaction)[edit]({ 
+      return ((isLegacy) ? reply : interaction)[edit]({
         content: "Você precisa estar no mesmo canal de voz que eu."
       });
     }

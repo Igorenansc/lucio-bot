@@ -24,7 +24,7 @@ const search = async (query, type = "track") => {
     const token = await requestAnonymousToken();
     const res = await fetch(
       `https://api.spotify.com/v1/search/?q=${encodeURIComponent(query)}&type=${type}&market=US`,
-      { 
+      {
         headers: {
           Authorization: `${token.type} ${token.token}`,
           "Content-Type": "application/json"
@@ -39,7 +39,7 @@ const search = async (query, type = "track") => {
       album: "albums",
       playlist: "playlists"
     }
-    
+
     return data[responseTypes[type]].items.map((item) => ({
       title: (type !== "playlist") ? item.name + " - " + item.artists.map((a) => a.name).join(", ") : item.name,
       url: item.external_urls?.spotify || `https://open.spotify.com/${type}/${m.id}`,

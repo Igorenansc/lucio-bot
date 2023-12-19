@@ -6,10 +6,10 @@ export const data = {
 };
 export async function run(client, interaction) {
   const isLegacy = !interaction?.options;
-  const reply = (isLegacy) 
+  const reply = (isLegacy)
     ? await interaction.reply({ content: "Lúcio está pensando...", ephemeral: true })
     : await interaction.deferReply({ ephemeral: true, fetchReply: true });
-    
+
   const edit = (isLegacy) ? "edit" : "editReply";
 
   const embedResponse = {
@@ -18,7 +18,7 @@ export async function run(client, interaction) {
     fields: [
       {
         name: "/p",
-        value: "Toca uma música no canal de voz atual, recebe como parâmetro o nome ou link da música."	
+        value: "Toca uma música no canal de voz atual, recebe como parâmetro o nome ou link da música."
       },
       {
         name: "/q",
