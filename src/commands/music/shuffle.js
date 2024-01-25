@@ -10,7 +10,7 @@ export async function run(client, interaction) {
   const isLegacy = !interaction?.options;
   const reply = (isLegacy)
     ? await interaction.reply({ content: "Lúcio está pensando..."})
-    : await interaction.deferReply({ ephemeral: false, fetchReply: true });
+    : await interaction.deferReply({ ephemeral: true, fetchReply: true });
 
   const edit = (isLegacy) ? "edit" : "editReply";
 

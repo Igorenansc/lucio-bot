@@ -41,8 +41,9 @@ const search = async (query, type = "track") => {
     }
 
     return data[responseTypes[type]].items.map((item) => ({
-      title: (type !== "playlist") ? item.name + " - " + item.artists.map((a) => a.name).join(", ") : item.name,
+      title: (type !== "playlist") ? item.name + " by " + item.artists.map((a) => a.name).join(", ") : item.name,
       url: item.external_urls?.spotify || `https://open.spotify.com/${type}/${m.id}`,
+      extra: (type === "track") ? item.duration_ms : item.total_tracks,
     }));
   } catch (e) {
     return [];

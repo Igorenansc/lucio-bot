@@ -77,7 +77,7 @@ export async function run(client, interaction) {
         repeatMode: QueueRepeatMode["AUTOPLAY"],
         selfDeaf: true,
         skipOnNoStream: true,
-        volume: client.volume || 2,
+        volume: client.baseVolume,
         leaveOnEmpty: true,
         leaveOnEmptyCooldown: 10000,
         leaveOnEnd: true,

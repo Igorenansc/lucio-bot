@@ -1,5 +1,6 @@
 import search from "../../utils/spotifyHelper.js";
 import { run as playMusic } from "./play.js"
+import { parseDuration } from '../../utils/queueMessage.js';
 
 export const data = {
   name: "sp",
@@ -43,7 +44,12 @@ export const autocomplete = async (interaction) => {
 
   const emoji = (type === "track") ? "🎵" : "🎶";
 
-  await interaction.respond(choices.map(({ title, url }) => ({ name: `${emoji} ${title}`.slice(0, 99), value: url })));
+  await interaction.respond(choices.map((opt) => {
+    const prefix = (type === "track")
+      ? `${emoji}[${parseDuration(Math.floor(opt.extra / 1000))}] -`
+      : `${emoji}`;
+    return ({ name: `${prefix} ${opt.title}`.slice(0, 99), value: opt.url });
+  }));
 };
 
 export const run = playMusic;

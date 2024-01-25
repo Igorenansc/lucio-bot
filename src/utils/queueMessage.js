@@ -112,3 +112,15 @@ export default function (queue, initialIndex = 0) {
 
   return { embeds: [embed], components: [actionRow, actionRow2] };
 }
+
+export const parseDuration = (duration) => {
+  const hours = Math.floor(duration / 3600);
+  const minutes = Math.floor((duration - (hours * 3600)) / 60);
+  const seconds = Math.floor(duration - (hours * 3600) - (minutes * 60));
+
+  const hoursStr = (hours < 10) ? `0${hours}` : hours;
+  const minutesStr = (minutes < 10) ? `0${minutes}` : minutes;
+  const secondsStr = (seconds < 10) ? `0${seconds}` : seconds;
+
+  return (hours > 0) ? `${hoursStr}:${minutesStr}:${secondsStr}` : `${minutesStr}:${secondsStr}`;
+};

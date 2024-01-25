@@ -44,7 +44,13 @@ export async function run(_client, interaction) {
   amount = (typeof amount === "number" && amount >= 1 && queue.tracks.data.length >= amount) ? amount - 1 : 0;
 
   const { currentTrack } = queue;
-  queue.node.skipTo(amount);
+
+  queue.node[`skip${(amount) ? "To" : ""}`](amount);
+  // if (amount) {
+  //   queue.node.skipTo(amount);
+  // } else {
+  //   queue.node.skip();
+  // }
 
   if (!currentTrack) return ((isLegacy) ? reply : interaction)[edit]("Não há músicas tocando no momento.");
   return ((isLegacy) ? reply : interaction)[edit]({

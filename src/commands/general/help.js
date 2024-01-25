@@ -21,6 +21,10 @@ export async function run(client, interaction) {
         value: "Toca uma música no canal de voz atual, recebe como parâmetro o nome ou link da música."
       },
       {
+        name: "/yt e /sp",
+        value: "Derivado do /p, funciona exatamente igual, porém com pesquisa e autocomplete para Youtube ou Spotify."
+      },
+      {
         name: "/q",
         value: "Mostra a fila de músicas."
       },
@@ -30,7 +34,7 @@ export async function run(client, interaction) {
       },
       {
         name: "/skip",
-        value: "Pula a música tocando atualmente."
+        value: "Pula uma ou várias músicas, parâmetro 'qtd' opcional."
       },
       {
         name: "/stop",

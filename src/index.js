@@ -18,7 +18,7 @@ client.commands = new Collection();
 client.categories = readdirSync(join(__dirname, "./commands"));
 client.owners = JSON.parse(process.env.OWNERS);
 client.prefix = (process.env?.PREFIX) ? JSON.parse(process.env.PREFIX) : "!!";
-client.volume = (process.env?.VOLUME) ? Number(JSON.parse(process.env.VOLUME)) : 2;
+client.baseVolume = (process.env?.VOLUME) ? Number(JSON.parse(process.env.VOLUME)) : 2;
 
 const player = new Player(client, {
   ytdlOptions: {
@@ -26,7 +26,7 @@ const player = new Player(client, {
     highWaterMark: 1 << 25,
     requestOptions: {
       headers: {
-        cookie: process.env?.YOUTUBE_COOKIE,
+        cookie: (process.env?.YOUTUBE_COOKIE) ? process.env.YOUTUBE_COOKIE : "",
       }
     }
   }

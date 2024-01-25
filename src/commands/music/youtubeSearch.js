@@ -1,5 +1,6 @@
 import { Client } from "youtubei";
 import { run as playMusic } from "./play.js"
+import { parseDuration } from '../../utils/queueMessage.js';
 
 export const data = {
   name: "yt",
@@ -46,7 +47,10 @@ export const autocomplete = async (interaction) => {
   const emoji = (type === "video") ? "🎵" : "🎶";
   const url = `https://www.youtube.com/${searchType[type]}`;
 
-  await interaction.respond(choices.map(({ title, id }) => ({ name: `${emoji} ${title}`.slice(0, 99), value: `${url}${id}` })));
+  await interaction.respond(choices.map((opt) => {
+    const prefix = (type === "video") ? `${emoji} [${parseDuration(opt.duration)}] -` : `${emoji}`;
+    return ({ name: `${prefix} ${opt.title}`.slice(0, 99), value: `${url}${opt.id}` })
+  }));
 };
 
 export const run = playMusic;
