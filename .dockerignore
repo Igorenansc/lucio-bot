@@ -4,5 +4,6 @@ npm-debug.log
 **/test.js
 .editorconfig
 
-.env?
+.env
+.env.example
 squarecloud.app

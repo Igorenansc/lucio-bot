@@ -1,4 +1,5 @@
 import { QueryType, QueueRepeatMode, useMainPlayer } from "discord-player";
+import { parse } from "dotenv";
 import fetch from "isomorphic-unfetch";
 
 const parseQuery = async (string) => {
@@ -52,9 +53,7 @@ export async function run(client, interaction) {
     voiceChannel = interaction.member.voice.channel;
     const permissions = voiceChannel.permissionsFor(interaction.client.user);
     if (!permissions.has("Speak") || !permissions.has("Connect")) {
-      return ((isLegacy) ? reply : interaction)[edit]({
-        content: "Eu não possuo permissão para entrar ou falar."
-      });
+      return ((isLegacy) ? reply : interaction)[edit]({ content: "Eu não possuo permissão para entrar ou falar." });
     }
   } catch (e) {
     console.log(e.message);
@@ -65,7 +64,9 @@ export async function run(client, interaction) {
     let query = (isLegacy)
       ? interaction.content.slice(3).trim()
       : interaction.options.getString("busca", true);
+
     const nodeAlreadyCreated = player.nodes.has(interaction.guild.id);
+
     const queue = (nodeAlreadyCreated)
       ? player.nodes.get(interaction.guild.id)
       : player.nodes.create(interaction.guild, {
@@ -102,6 +103,12 @@ export async function run(client, interaction) {
       searchEngine: QueryType[type],
     });
 
+    console.log(query);
+    console.log(queryType(query));
+    console.log(parseQuery(query));
+
+    console.log(result)
+
     if (!result.hasTracks()) return ((isLegacy) ? reply : interaction)[edit]({ content: "Não obtive resultados." });
 
     const song = (listTypes.includes(type)) ? result.tracks : result.tracks[0];
@@ -115,7 +122,7 @@ export async function run(client, interaction) {
     return ((isLegacy) ? reply : interaction)[edit](message);
 
     } catch (e) {
-    console.log(e);
+    console.log("Error in /play:", e);
     return ((isLegacy) ? reply : interaction)[edit]({ content: "Algo deu errado!" });
   }
 }

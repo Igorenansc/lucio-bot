@@ -1,4 +1,5 @@
-import { SpotifyExtractor, YouTubeExtractor } from "@discord-player/extractor";
+import { SpotifyExtractor } from "@discord-player/extractor";
+import { YoutubeiExtractor, generateOauthTokens } from "discord-player-youtubei";
 import { Player } from "discord-player";
 import { Client, Collection } from "discord.js";
 import { config } from "dotenv";
@@ -13,6 +14,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const client = new Client({ intents: ["Guilds", "GuildMessages", "MessageContent", "GuildVoiceStates"] });
+const oAuthToken = process.env?.OAUTHTOKEN && JSON.parse(process.env.OAUTHTOKEN);
 
 client.commands = new Collection();
 client.categories = readdirSync(join(__dirname, "./commands"));
@@ -20,19 +22,25 @@ client.owners = JSON.parse(process.env.OWNERS);
 client.prefix = (process.env?.PREFIX) ? JSON.parse(process.env.PREFIX) : "!!";
 client.baseVolume = (process.env?.VOLUME) ? Number(JSON.parse(process.env.VOLUME)) : 2;
 
+
 const player = new Player(client, {
   ytdlOptions: {
     quality: "highestaudio",
     highWaterMark: 1 << 25,
-    requestOptions: {
-      headers: {
-        cookie: (process.env?.YOUTUBE_COOKIE) ? process.env.YOUTUBE_COOKIE : "",
-      }
-    }
+    // requestOptions: {
+    //   headers: {
+    //     cookie: (process.env?.COOKIE2) ? JSON.parse(process.env.COOKIE2) : "",
+    //     // cookie: (process.env?.YOUTUBE_COOKIE) ? process.env.YOUTUBE_COOKIE : "",
+    //   }
+    // }
   }
 });
 
-player.extractors.register(YouTubeExtractor);
+if (oAuthToken) {
+  player.extractors.register(YoutubeiExtractor, { authentication: oAuthToken });
+} else {
+  player.extractors.register(YoutubeiExtractor);
+}
 player.extractors.register(SpotifyExtractor);
 
 player.events.on("playerStart", playerMessage.create);

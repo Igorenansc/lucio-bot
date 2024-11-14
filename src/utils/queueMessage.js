@@ -38,7 +38,7 @@ export default function (queue, initialIndex = 0) {
 
   // console.log([initialIndex, initialTrackIndex, finalTrackIndex, lowerRange, upperRange])
 
-  // that crazyness of characters on the labels are to make the buttons larger using invisible characters and spaces
+  // that crazyness of characters on the labels are to make the buttons larger using invisible characters/spaces
   const previousPageButton = {
     type: 2,
     custom_id: "queue_message_previous",
