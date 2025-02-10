@@ -14,16 +14,16 @@ const parseQuery = async (string) => {
 }
 
 const queryType = async (string) => {
-  const urlRegex = /^(?:(?:https?):\/\/)?[\w/\-?=%.]+\.[\w/\-?=%&.]+$/
+  const urlRegex = /^(?:(?:https?):\/\/)?[\w/\-?=%.]+\.[\w/\-?=%&.]+$/;
 
   if (string.includes("open.spotify.com")) {
     const suffix = string.split("open.spotify.com")[1].split("/")[1].toUpperCase();
 
-    return `SPOTIFY_${(suffix === "TRACK") ? "SONG" : suffix }`
+    return `SPOTIFY_${(suffix === "TRACK") ? "SONG" : suffix }`;
   }
-  if (urlRegex.test(string)) return (string.includes("youtube.com/playlist")) ? "YOUTUBE_PLAYLIST" : "YOUTUBE_VIDEO"
+  if (urlRegex.test(string)) return (string.includes("youtube.com/playlist")) ? "YOUTUBE_PLAYLIST" : "YOUTUBE_VIDEO";
 
-  return "YOUTUBE_SEARCH"
+  return "YOUTUBE_SEARCH";
 };
 
 export const data = {
@@ -85,15 +85,15 @@ export async function run(client, interaction) {
         leaveOnEndCooldown: 3000000,
       });
 
-      if (!queue.connection) await queue.connect(voiceChannel);
-      if (nodeAlreadyCreated) {
-        if (voiceChannel.id !== queue.channel.id) {
-          return ((isLegacy) ? reply : interaction)[edit]({
-            content: "Você precisa estar no mesmo canal de voz que eu."
-          });
-        }
-        queue.metadata.interaction = interaction;
+    if (!queue.connection) await queue.connect(voiceChannel);
+    if (nodeAlreadyCreated) {
+      if (voiceChannel.id !== queue.channel.id) {
+        return ((isLegacy) ? reply : interaction)[edit]({
+          content: "Você precisa estar no mesmo canal de voz que eu."
+        });
       }
+      queue.metadata.interaction = interaction;
+    }
 
     const listTypes = ["YOUTUBE_PLAYLIST", "SPOTIFY_ALBUM", "SPOTIFY_PLAYLIST"];
     query = await parseQuery(query);
@@ -102,12 +102,6 @@ export async function run(client, interaction) {
       requestedBy: interaction.member || interaction.member.me,
       searchEngine: QueryType[type],
     });
-
-    console.log(query);
-    console.log(queryType(query));
-    console.log(parseQuery(query));
-
-    console.log(result)
 
     if (!result.hasTracks()) return ((isLegacy) ? reply : interaction)[edit]({ content: "Não obtive resultados." });
 

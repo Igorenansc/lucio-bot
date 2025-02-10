@@ -1,5 +1,5 @@
-import { SpotifyExtractor } from "@discord-player/extractor";
 import { YoutubeiExtractor, generateOauthTokens } from "discord-player-youtubei";
+import { DefaultExtractors } from '@discord-player/extractor';
 import { Player } from "discord-player";
 import { Client, Collection } from "discord.js";
 import { config } from "dotenv";
@@ -13,7 +13,8 @@ config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const client = new Client({ intents: ["Guilds", "GuildMessages", "MessageContent", "GuildVoiceStates"] });
+const client = new Client({ intents: ["Guilds", "GuildMessages", "MessageContent", "GuildVoiceStates"]});
+const ytCookies = process.env.YT_COOKIES;
 const oAuthToken = process.env?.OAUTHTOKEN && JSON.parse(process.env.OAUTHTOKEN);
 
 client.commands = new Collection();
@@ -25,7 +26,7 @@ client.baseVolume = (process.env?.VOLUME) ? Number(JSON.parse(process.env.VOLUME
 
 const player = new Player(client, {
   ytdlOptions: {
-    quality: "highestaudio",
+    quality: "lowestaudio",
     highWaterMark: 1 << 25,
     // requestOptions: {
     //   headers: {
@@ -36,12 +37,18 @@ const player = new Player(client, {
   }
 });
 
-if (oAuthToken) {
-  player.extractors.register(YoutubeiExtractor, { authentication: oAuthToken });
-} else {
-  player.extractors.register(YoutubeiExtractor);
-}
-player.extractors.register(SpotifyExtractor);
+// const player = new Player(client);
+
+
+// player.extractors.register(YoutubeiExtractor)
+player.extractors.register(YoutubeiExtractor, {
+  cookie: ytCookies
+});
+
+
+// player.extractors.loadDefault()
+await player.extractors.loadMulti(DefaultExtractors)
+
 
 player.events.on("playerStart", playerMessage.create);
 

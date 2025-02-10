@@ -30,7 +30,7 @@ export async function run(client, interaction) {
       },
       {
         name: "/autoplay",
-        value: "Habilita/desabilita o modo autoplay, já vem ativado por padrão."
+        value: "Habilita/desabilita o modo autoplay. (Já vem ativado por padrão)"
       },
       {
         name: "/skip",

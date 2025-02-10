@@ -8,6 +8,7 @@ export default async (client, interaction) => {
       const command = client.commands.get(interaction.commandName);
       try {
         await command.autocomplete(interaction);
+        // await command.autocompleteRun(interaction);
       } catch (e) {
         console.error(e);
       }
