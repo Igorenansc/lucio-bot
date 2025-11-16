@@ -1,5 +1,7 @@
-const createPlayerMessage = async (queue, track) => {
-  const { metadata: { channel, isFirstInteraction } } = queue;
+import { parseDuration } from "./queueMessage.js";
+
+const createPlayerMessage = async (player, track) => {
+  const { metadata: { channel, isFirstInteraction } } = player;
 
   const playPauseButton = {
     type: 2,
@@ -11,7 +13,7 @@ const createPlayerMessage = async (queue, track) => {
   const stopButton = {
     type: 2,
     custom_id: "music_stop",
-    label: "Parar",
+    label: "Parar‎",
     style: 4,
   }
 
@@ -40,7 +42,7 @@ const createPlayerMessage = async (queue, track) => {
   const refreshButton = {
     type: 2,
     custom_id: "music_refresh",
-    label: "‎ ‎ ‎ ‎ ↻‎ ‎ ‎ ‎ ",
+    label: "‎ ‎ ‎ ‎↻‎ ‎ ‎ ‎ ",
     style: 2,
   };
 
@@ -66,35 +68,36 @@ const createPlayerMessage = async (queue, track) => {
       name: track.author,
     },
     title: track.title,
-    url: track.url,
+    url: track.uri,
     thumbnail: {
       url: track.thumbnail,
     },
-    description: `\`[0:00] / [${track.duration}]\``,
+    description: (track.isStream) ? ":red_circle: **AO VIVO**" : `\`[0:00] / [${parseDuration(track.length)}]\``,
+    /*
     footer: {
       text: `${track.views} visualizações`,
     },
+    */
   };
 
   try {
-    if (isFirstInteraction) {
+    if (isFirstInteraction || !player.metadata?.message) {
       const message = await channel.send({ embeds: [playing], components: [actionRow1, actionRow2] });
-      queue.metadata.message = message;
-      queue.metadata.isFirstInteraction = false;
+      player.metadata.message = message;
+      player.metadata.isFirstInteraction = false;
     } else {
-      queue.metadata.message.edit({ embeds: [playing], components: [actionRow1, actionRow2] });
+      player.metadata.message.edit({ embeds: [playing], components: [actionRow1, actionRow2] });
     }
   } catch (e) {
     console.log(e.message);
   }
 }
 
-const deletePlayerMessage = async (queue) => {
-  const { metadata: { message } } = queue;
+const deletePlayerMessage = async (player) => {
   try {
-    await message.delete();
-    queue.metadata.isFirstInteraction = true;
-  } catch {
+    player.metadata.isFirstInteraction = true;
+    await player.metadata.message.delete();
+  } catch (e) {
     console.log("Already deleted");
   }
 }

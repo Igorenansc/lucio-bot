@@ -1,4 +1,4 @@
-FROM node:18.20.3
+FROM node:20
 
 WORKDIR /usr/src/app
 
@@ -14,8 +14,10 @@ COPY . .
 
 RUN npm install pm2@latest -g
 
-RUN echo "alias start='pm2 start ~/../usr/src/app/src/index.js --max-memory-restart 400M --name Lucio'" >> ~/.bashrc
+# RUN echo "alias start='pm2 start ~/../usr/src/app/src/index.js --max-memory-restart 400M --name Lucio'" >> ~/.bashrc
+RUN echo "alias start='pm2 start ~/../usr/src/app/src/index.js --name Lucio'" >> ~/.bashrc
 RUN echo "alias restart='pm2 delete Lucio && start'" >> ~/.bashrc
 
 # ENTRYPOINT ["/bin/bash"]
-CMD ["/bin/bash", "-c", "pm2-runtime start ~/../usr/src/app/src/index.js --max-memory-restart 400M --name Lucio"]
+# CMD ["/bin/bash", "-c", "pm2-runtime start ~/../usr/src/app/src/index.js --max-memory-restart 400M --name Lucio"]
+CMD ["/bin/bash", "-c", "pm2-runtime start ~/../usr/src/app/src/index.js --name Lucio"]

@@ -1,5 +1,3 @@
-import { useMainPlayer } from "discord-player";
-
 export const data = {
   name: "skip",
   description: "Pula a música tocando atualmente",
@@ -14,7 +12,7 @@ export const data = {
   ],
 };
 
-export async function run(_client, interaction) {
+export async function run(client, interaction) {
   const isLegacy = !interaction?.options;
   const reply = (isLegacy)
     ? await interaction.reply({ content: "Lúcio está pensando..."})
@@ -22,12 +20,12 @@ export async function run(_client, interaction) {
 
   const edit = (isLegacy) ? "edit" : "editReply";
 
-  const player = useMainPlayer();
-  const queue = player.nodes.get(interaction.guild);
-  if (!queue || !queue.node.isPlaying) return ((isLegacy) ? reply : interaction)[edit]("Não há músicas tocando no momento.")
+  const { player } = (client[interaction.guild.id]?.player) ? client[interaction.guild.id] : { player: null };;
+
+  if ( !player?.queue?.current || !player?.playing) return ((isLegacy) ? reply : interaction)[edit]("Não há músicas tocando no momento.")
 
   try {
-    if (interaction.member.voice.channel.id !== queue.channel.id) {
+    if (interaction.member.voice.channel.id !== player.voiceId) {
       return ((isLegacy) ? reply : interaction)[edit]({
         content: "Você precisa estar no mesmo canal de voz que eu."
       });
@@ -41,20 +39,24 @@ export async function run(_client, interaction) {
     ? Number(interaction.content.slice(6).trim())
     : Number(interaction.options.get("qtd")?.value);
 
-  amount = (typeof amount === "number" && amount >= 1 && queue.tracks.data.length >= amount) ? amount - 1 : 0;
+  amount = (typeof amount === "number" && amount >= 1 && player.queue.size >= amount) ? amount - 1 : 0;
 
-  const { currentTrack } = queue;
+  const { current } = player.queue;
+  if (!current) return ((isLegacy) ? reply : interaction)[edit]("Não há músicas tocando no momento.");
 
-  queue.node[`skip${(amount) ? "To" : ""}`](amount);
-  // if (amount) {
-  //   queue.node.skipTo(amount);
-  // } else {
-  //   queue.node.skip();
-  // }
+  if (amount) {
+    const newQueue = [...player.queue];
+    newQueue.splice(0, amount);
+    player.queue.clear()
+    player.queue.add(newQueue);
+    player.skip();
+  } else {
+    player.skip();
+    // queue.node.skip();
+  }
 
-  if (!currentTrack) return ((isLegacy) ? reply : interaction)[edit]("Não há músicas tocando no momento.");
   return ((isLegacy) ? reply : interaction)[edit]({
-    content: (!amount) ? `A música **${currentTrack.title}** foi pulada!`
+    content: (!amount) ? `A música **${current.title}** foi pulada!`
     : `**${amount + 1}** músicas foram puladas!`
   });
   // return ((isLegacy) ? reply : interaction)[edit]({ content: `A música **${currentTrack.title}** foi pulada!` });

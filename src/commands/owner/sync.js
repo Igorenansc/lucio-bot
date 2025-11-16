@@ -17,7 +17,6 @@ export const data = {
   description: "Syncs the slash commands with Discord's API",
 };
 export async function run(client, interaction, args) {
-  console.log(interaction.member?.permissions.has("Administrator"));
   if (interaction.member?.permissions.has("Administrator") || client.owners.includes(interaction.member.id)) {
     try {
       const commands = [];
@@ -32,7 +31,7 @@ export async function run(client, interaction, args) {
           // const command = await import(path.resolve(__dirname, `${commandsPath}/${folder}/${file}`));
 
           if (command?.data && command?.data?.name !== "sync") {
-            console.log(command.data.name);
+            console.log(`Client luciov3: Debug, command "/${command.data.name}" sync'd with discord.`);
             commands.push(command.data);
           }
         }
@@ -42,7 +41,7 @@ export async function run(client, interaction, args) {
         Routes.applicationCommands(process.env.BOT_ID),
         { body: commands });
 
-      console.log("Comandos registrados com sucesso!");
+      console.log("Client luciov3: Debug, Comandos registrados com sucesso!");
       interaction.reply("Comandos registrados com sucesso!");
     } catch (e) {
       console.error(e);

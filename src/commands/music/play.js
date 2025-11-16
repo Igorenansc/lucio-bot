@@ -1,6 +1,6 @@
-import { QueryType, QueueRepeatMode, useMainPlayer } from "discord-player";
-import { parse } from "dotenv";
 import fetch from "isomorphic-unfetch";
+import { parseDuration } from "../../utils/queueMessage.js";
+import { Innertube } from "youtubei.js";
 
 const parseQuery = async (string) => {
   let query = string;
@@ -47,7 +47,6 @@ export async function run(client, interaction) {
   const edit = (isLegacy) ? "edit" : "editReply";
 
   let voiceChannel;
-  const player = useMainPlayer();
 
   try {
     voiceChannel = interaction.member.voice.channel;
@@ -65,57 +64,75 @@ export async function run(client, interaction) {
       ? interaction.content.slice(3).trim()
       : interaction.options.getString("busca", true);
 
-    const nodeAlreadyCreated = player.nodes.has(interaction.guild.id);
+    // Get the current player
+    let { player } = (client[interaction.guild.id]?.player) ? client[interaction.guild.id] : { player: null };
 
-    const queue = (nodeAlreadyCreated)
-      ? player.nodes.get(interaction.guild.id)
-      : player.nodes.create(interaction.guild, {
-        metadata: {
-          channel: interaction.channel,
-          isFirstInteraction: true,
-        },
-        disableHistory: true,
-        repeatMode: QueueRepeatMode["AUTOPLAY"],
-        selfDeaf: true,
-        skipOnNoStream: true,
-        volume: client.baseVolume,
-        leaveOnEmpty: true,
-        leaveOnEmptyCooldown: 10000,
-        leaveOnEnd: true,
-        leaveOnEndCooldown: 3000000,
-      });
-
-    if (!queue.connection) await queue.connect(voiceChannel);
-    if (nodeAlreadyCreated) {
-      if (voiceChannel.id !== queue.channel.id) {
-        return ((isLegacy) ? reply : interaction)[edit]({
-          content: "Você precisa estar no mesmo canal de voz que eu."
-        });
-      }
-      queue.metadata.interaction = interaction;
+    // Check if the user is in the same voice channel as the bot
+    if (player && interaction.member.voice.channel.id !== player.voiceId) {
+      return ((isLegacy) ? reply : interaction)[edit]({ content: "Você precisa estar no mesmo canal de voz que eu para utilizar esse comando." });
     }
 
-    const listTypes = ["YOUTUBE_PLAYLIST", "SPOTIFY_ALBUM", "SPOTIFY_PLAYLIST"];
-    query = await parseQuery(query);
-    const type = await queryType(query);
-    const result = await player.search(query, {
-      requestedBy: interaction.member || interaction.member.me,
-      searchEngine: QueryType[type],
-    });
 
-    if (!result.hasTracks()) return ((isLegacy) ? reply : interaction)[edit]({ content: "Não obtive resultados." });
+    if (!player) {
+      player = await client.manager.createPlayer({
+        guildId: interaction.guild.id,
+        voiceId: interaction.member.voice.channel.id,
+        textId: interaction.channel.id,
+        volume: client.baseVolume,
+        deaf: true,
+      });
 
-    const song = (listTypes.includes(type)) ? result.tracks : result.tracks[0];
-    queue.addTrack(song);
+      player.metadata = {
+        ...player.metadata,
+        autoplay: true,
+        channel: interaction.channel,
+        isFirstInteraction: true,
+        message: null,
+      };
 
-    if (!queue.node.isPlaying() && !queue.node.isPaused()) queue.node.play();
+      player.youtubeClient = await Innertube.create({ retrieve_player: false });
 
-    const message = {
-      content: `${(listTypes.includes(type)) ? `A playlist **${song[0].playlist.title}** com **${song.length}** músicas foi` : `**${song.title} - [${song.duration}]**` } adicionada!`
+      const deletePlayer = async (client) => {
+        await player.destroy();
+        client[interaction.guild.id].player = null;
+      }
+
+      player.delete = deletePlayer.bind(null, client);
+      player.search = client.manager.search.bind(client.manager); // Bind the search method to the player
+      player.toggleAutoPlay = ((pl) => pl.metadata.autoplay = !pl.metadata.autoplay).bind(null, player);
+
+      client[interaction.guild.id] = { player };
+    }
+
+
+    const res = await client.manager.search(
+      query,
+      {
+        requester: interaction[(isLegacy) ? "author" : "user"],
+        engine: "youtube",
+      },
+    );
+
+    const { type, tracks, playlistName } = res;
+
+    if (!tracks.length) return ((isLegacy) ? reply : interaction)[edit]({ content: "Nenhum resultado encontrado!" });
+
+    let message;
+    const isPlaylist = type === "PLAYLIST";
+
+    player.queue.add((isPlaylist) ? tracks : tracks[0]); // Add the first track from the search results
+    message = {
+      content: `${(isPlaylist) ? `A playlist **${playlistName}** com **${tracks.length}** músicas foi` : `**${tracks[0].title} - ${(tracks[0].isStream ? `[AO VIVO]` : `[${parseDuration(tracks[0].length)}]`)}**` } adicionada!`
     };
+
+    // if (!player.isAutoplay) await player.autoplay(player);
+    if (!player.playing && !player.paused) player.play();
+
+    // if (!player.playing && !player.paused && player.queue.size === tracks.length) await player.play();
+
     return ((isLegacy) ? reply : interaction)[edit](message);
 
-    } catch (e) {
+  } catch (e) {
     console.log("Error in /play:", e);
     return ((isLegacy) ? reply : interaction)[edit]({ content: "Algo deu errado!" });
   }

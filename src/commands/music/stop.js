@@ -1,4 +1,3 @@
-import { useMainPlayer } from "discord-player";
 import playerMessage from "../../utils/playerMessage.js";
 
 export const data = {
@@ -15,12 +14,11 @@ export async function run(client, interaction) {
 
   const edit = (isLegacy) ? "edit" : "editReply";
 
-  const player = useMainPlayer();
-  const queue  = player.nodes.get(interaction.guild);
-  if (!queue || !queue.node.isPlaying) return ((isLegacy) ? reply : interaction)[edit]("Não há músicas tocando no momento.")
+  const { player } = (client[interaction.guild.id]?.player) ? client[interaction.guild.id] : { player: null };
+  if (!player) return ((isLegacy) ? reply : interaction)[edit]("Não há músicas tocando no momento.")
 
   try {
-    if (interaction.member.voice.channel.id !== queue.channel.id) {
+    if (interaction.member.voice.channel.id !== player.voiceId) {
       return ((isLegacy) ? reply : interaction)[edit]({
         content: "Você precisa estar no mesmo canal de voz que eu."
       });
@@ -29,8 +27,8 @@ export async function run(client, interaction) {
     return ((isLegacy) ? reply : interaction)[edit]({ content: "Você precisa estar conectado a um chat de voz!" });
   }
 
-  playerMessage.delete(queue);
-  queue.delete();
+  playerMessage.delete(player);
+  player.delete();
 
   return ((isLegacy) ? reply : interaction)[edit]({ content: "A fila foi limpa e o bot removido!" });
 }

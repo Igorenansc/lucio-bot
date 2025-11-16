@@ -1,12 +1,10 @@
-import { QueueRepeatMode, useMainPlayer } from "discord-player";
-
 export const data = {
   name: "autoplay",
   description: "Habilita o autoplay.",
   options: [],
 };
 
-export async function run(_client, interaction) {
+export async function run(client, interaction) {
   const isLegacy = !interaction?.options;
   const reply = (isLegacy)
     ? await interaction.reply({ content: "Lúcio está pensando..."})
@@ -14,12 +12,11 @@ export async function run(_client, interaction) {
 
   const edit = (isLegacy) ? "edit" : "editReply";
 
-  const player = useMainPlayer();
-  const queue  = player.nodes.get(interaction.guild);
-  if (!queue) return ((isLegacy) ? reply : interaction)[edit]("Não há fila de músicas.")
+  const { player } = (client[interaction.guild.id]?.player) ? client[interaction.guild.id] : { player: null };;
 
+  if (!player) return ((isLegacy) ? reply : interaction)[edit]("Não há fila de músicas.")
   try {
-    if (interaction.member.voice.channel.id !== queue.channel.id) {
+    if (interaction.member.voice.channel.id !== player.voiceId) {
       return ((isLegacy) ? reply : interaction)[edit]({
         content: "Você precisa estar no mesmo canal de voz que eu."
       });
@@ -28,9 +25,7 @@ export async function run(_client, interaction) {
     return ((isLegacy) ? reply : interaction)[edit]({ content: "Você precisa estar conectado a um chat de voz!" });
   }
 
-  const isAutoPlaying = queue.repeatMode === 3;
+  player.toggleAutoPlay();
 
-  queue.setRepeatMode( QueueRepeatMode[(isAutoPlaying) ? "OFF" : "AUTOPLAY"] );
-
-  return ((isLegacy) ? reply : interaction)[edit]({ content: `O autoplay foi ${ (isAutoPlaying) ? "desabilitado!" : "habilitado!"}` });
+  return ((isLegacy) ? reply : interaction)[edit]({ content: `O autoplay foi ${ (!player.metadata.autoplay) ? "desabilitado!" : "habilitado!"}` });
 }

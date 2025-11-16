@@ -1,82 +1,105 @@
-import { YoutubeiExtractor, generateOauthTokens } from "discord-player-youtubei";
-import { DefaultExtractors } from '@discord-player/extractor';
-import { Player } from "discord-player";
-import { Client, Collection } from "discord.js";
+import { Client, Collection, GatewayIntentBits } from "discord.js";
+import { Connectors, Player } from "shoukaku";
+import { Kazagumo } from "kazagumo";
 import { config } from "dotenv";
 import { readdirSync } from "fs";
 import path, { join } from "path";
 import { fileURLToPath } from "url";
+import autoplay from "./utils/autoplayHandler.js";
 import playerMessage from "./utils/playerMessage.js";
+import { parseDuration } from "./utils/queueMessage.js";
 
 config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const client = new Client({ intents: ["Guilds", "GuildMessages", "MessageContent", "GuildVoiceStates"]});
-const ytCookies = process.env.YT_COOKIES;
-const oAuthToken = process.env?.OAUTHTOKEN && JSON.parse(process.env.OAUTHTOKEN);
+const nodes = JSON.parse(process.env.NODES);
+
+const { Guilds, GuildMessages, MessageContent, GuildVoiceStates } = GatewayIntentBits;
+const client = new Client({ intents: [Guilds, GuildMessages, MessageContent, GuildVoiceStates]});
 
 client.commands = new Collection();
 client.categories = readdirSync(join(__dirname, "./commands"));
 client.owners = JSON.parse(process.env.OWNERS);
 client.prefix = (process.env?.PREFIX) ? JSON.parse(process.env.PREFIX) : "!!";
 client.baseVolume = (process.env?.VOLUME) ? Number(JSON.parse(process.env.VOLUME)) : 2;
+client.autoDisconnect = 10000;
 
+client.manager = new Kazagumo({
+  send: (guildId, payload) => {
+    const guild = client.guilds.cache.get(guildId);
+    if (guild) guild.shard.send(payload);
+  },
+  defaultSearchEngine: "youtube",
+}, new Connectors.DiscordJS(client), nodes);
 
-const player = new Player(client, {
-  ytdlOptions: {
-    quality: "lowestaudio",
-    highWaterMark: 1 << 25,
-    // requestOptions: {
-    //   headers: {
-    //     cookie: (process.env?.COOKIE2) ? JSON.parse(process.env.COOKIE2) : "",
-    //     // cookie: (process.env?.YOUTUBE_COOKIE) ? process.env.YOUTUBE_COOKIE : "",
-    //   }
-    // }
+client.manager.shoukaku.on('ready', (name) => console.log(`Lavalink ${name}: Ready!`));
+client.manager.shoukaku.on('error', (name, error) => console.error(`Lavalink ${name}: Error Caught,`, error));
+client.manager.shoukaku.on('close', (name, code, reason) => console.warn(`Lavalink ${name}: Closed, Code ${code}, Reason ${reason || 'No reason'}`));
+client.manager.shoukaku.on('debug', (name, info) => console.debug(`Lavalink ${name}: Debug,`, info));
+client.manager.shoukaku.on('disconnect', (name, count) => {
+    const players = [...client.manager.shoukaku.players.values()].filter(p => p.node.name === name);
+    players.map(player => {
+        kazagumo.destroyPlayer(player.guildId);
+        player.destroy();
+    });
+    console.warn(`Lavalink ${name}: Disconnected`);
+});
+
+client.manager.on("playerCreate", async (player) => {
+  if (client.autoDisconnect) {
+    const interval = setInterval(async () => {
+      const channel = client.channels.cache.get(player.voiceId);
+      const userQty = [...channel.members].length;
+      // const userQty = [...client.channels.cache.get(player.voiceId).members].length;
+      console.log(`Client luciov3: ${((userQty - 1) <= 0 ? 0 : userQty - 1)} users connected in ${channel.name} on ${client.guilds.cache.get(player.guildId).name}`);
+      if (userQty <= 1) await player.delete();
+    }, client.autoDisconnect);
+    player.autoDisconnect = interval;
   }
 });
+client.manager.on("playerStart", async (player, track) => {
+  playerMessage.create(player, track);
+  player.lastVideo = {
+    id: track.uri.split("watch?v=")[1],
+    requester: track.requester,
+  };
+  player.metadata.trackStart = {
+    time: Date.now(),
+  }
+  // console.log(client.user)
+  // console.log(player.lastVideo.requester)
+  if (player.queue.size === 0) await autoplay(player, player.lastVideo.id, player.lastVideo.requester, true);
+});
+client.manager.on("playerStuck", (player, data) => {
+  player.metadata.trackStart.pausedTime = Date.now();
+  player.pause(true);
+})
 
-// const player = new Player(client);
-
-
-// player.extractors.register(YoutubeiExtractor)
-player.extractors.register(YoutubeiExtractor, {
-  cookie: ytCookies
+client.manager.on("playerDestroy", (player) => {
+  if (player.autoDisconnect) clearInterval(player.autoDisconnect);
+  playerMessage.delete(player);
 });
 
+client.manager.on("playerClosed", playerMessage.delete);
+client.manager.on("playerEmpty", autoplay);
 
-// player.extractors.loadDefault()
-await player.extractors.loadMulti(DefaultExtractors)
 
-
-player.events.on("playerStart", playerMessage.create);
-
-player.events.on("emptyQueue", playerMessage.delete);
-player.events.on("connectionDestroyed", playerMessage.delete);
-player.events.on("disconnect", playerMessage.delete);
-
-player.events.on("playerError", async (queue, error, track) => {
-  await playerMessage.delete(queue);
-  console.log(`
-    playerError: ${error.message}
-    track: ${track.title}
-    `
-    );
+// Event: When the bot is ready to start working
+/*
+client.on("ready", () => {
+  client.manager.init(client.user.id);
+  console.log(`${client.user.tag} is ready!`);
 });
+ */
 
-// Disconnect bug fix by ramsydx
-// https://github.com/discordjs/discord.js/issues/9185#issuecomment-1459083216
-// const networkStateChangeHandler = (oldNetworkState, newNetworkState) => {
-//   const newUdp = Reflect.get(newNetworkState, "udp");
-//   clearInterval(newUdp?.keepAliveInterval);
-// }
-// player.events.on("connectionCreate", (queue) => {
-//   queue.connection.voiceConnection.on("stateChange", (oldState, newState) => {
-//     Reflect.get(oldState, "networking")?.off("stateChange", networkStateChangeHandler);
-//     Reflect.get(newState, "networking")?.on("stateChange", networkStateChangeHandler);
-//   });
-// });
+/*
+// Event: Handling raw WebSocket events
+client.on("raw", data => {
+  client.manager.packetUpdate(data);
+});
+*/
 
 // Event Handler
 readdirSync(join(__dirname, "./events")).forEach(async file => {

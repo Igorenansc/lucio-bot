@@ -1,3 +1,4 @@
+import { Innertube } from "youtubei.js";
 import { Client } from "youtubei";
 import { run as playMusic } from "./play.js"
 import { parseDuration } from '../../utils/queueMessage.js';
@@ -35,21 +36,39 @@ export const data = {
 export const autocomplete = async (interaction) => {
   const focusedValue = interaction.options.getFocused();
   const type = interaction.options.get("tipo").value;
-  const client = new Client;
+  let client
+
+  if (type === "video") {
+    client = new Client;
+  } else {
+    client = await Innertube.create();
+  }
 
   const searchType = {
     video: "watch?v=",
     playlist: "playlist?list="
   }
 
-  const choices = (await client.search(focusedValue, { type })).items;
+  let results = (await client.search(focusedValue, { type }))[(type === "video") ? "items" : "results"];
+
+  results = results.filter((opt) => {
+    if (type === "video") {
+      if (opt.title && opt.id) return true
+    } else {
+      if (opt.metadata?.title?.text && opt.content_id) return true
+    }
+    return false
+  })
 
   const emoji = (type === "video") ? "🎵" : "🎶";
   const url = `https://www.youtube.com/${searchType[type]}`;
+  console.log(results[0])
 
-  await interaction.respond(choices.map((opt) => {
-    const prefix = (type === "video") ? `${emoji} [${parseDuration(opt.duration)}] -` : `${emoji}`;
-    return ({ name: `${prefix} ${opt.title}`.slice(0, 99), value: `${url}${opt.id}` })
+
+  results
+  await interaction.respond(results.map((opt) => {
+    const prefix = (type === "video") ? `${emoji} [${parseDuration(opt.duration, true)}] -` : `${emoji}`;
+    return ({ name: `${prefix} ${(type === "video") ? opt.title : opt.metadata.title.text}`.slice(0, 99), value: `${url}${(type === "video") ? opt.id : opt.content_id}` })
   }));
 };
 

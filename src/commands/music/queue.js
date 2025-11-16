@@ -1,4 +1,3 @@
-import { useMainPlayer } from "discord-player";
 import queueMessage from "../../utils/queueMessage.js";
 
 export const data = {
@@ -15,13 +14,12 @@ export async function run(client, interaction) {
 
   const edit = (isLegacy) ? "edit" : "editReply";
 
-  const player = useMainPlayer();
-  const queue = player.nodes.get(interaction.guild);
+  const { player } = (client[interaction.guild.id]?.player) ? client[interaction.guild.id] : { player: null };
 
-  if (!queue || !queue.currentTrack || !queue.node.isPlaying) return ((isLegacy) ? reply : interaction)[edit]("Não há música tocando no momento.")
+  if (!player || !player.queue.current || !player.playing) return ((isLegacy) ? reply : interaction)[edit]("Não há música tocando no momento.")
 
   try {
-    const queueMsg = queueMessage(queue);
+    const queueMsg = queueMessage(player);
 
     return ((isLegacy) ? reply : interaction)[edit](queueMsg);
   } catch (e) {

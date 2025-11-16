@@ -1,9 +1,0 @@
-.git
-node_modules
-npm-debug.log
-**/test.js
-.editorconfig
-
-.env
-.env.example
-squarecloud.app

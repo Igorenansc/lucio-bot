@@ -1,11 +1,13 @@
-export default function (queue, initialIndex = 0) {
-  const queueLength = queue.tracks.data.length;
+export default function (player, initialIndex = 0) {
+  const queueLength = player.queue.size;
   let initialTrackIndex = (queueLength >= initialIndex) ? initialIndex : Math.floor(queueLength / 10) * 10;
   let finalTrackIndex = initialTrackIndex + 10;
 
-  const queueStr = queue.tracks.data.slice(initialTrackIndex, finalTrackIndex).map((music, i) => {
-    return `**${initialTrackIndex + (i + 1)} - ** ${music.title} - ${music.duration}`;
-  }).join("\n");
+  const tracks = [...player.queue];
+  const queueStr = (!tracks.length) ? ":cricket:‎ ‎ ‎:cricket::cricket:‎ ‎:cricket:"
+                                    : tracks.slice(initialTrackIndex, finalTrackIndex).map((music, i) => {
+                                        return `**${initialTrackIndex + (i + 1)} - ** ${music.title} - ${(music.isStream) ? "AO VIVO" : `${parseDuration(music.length)}`}`;
+                                      }).join("\n");
 
   const repeatMode = {
     0: ":play_pause: OFF",
@@ -84,13 +86,18 @@ export default function (queue, initialIndex = 0) {
     fields: [
       {
         name: ":musical_note: Tocando Agora",
-        value: `${queue.currentTrack.title}\n${queue.node.createProgressBar()}\n`,
+        value: `${player.queue.current.title}`,
         inline: true,
       },
       {
-        name: ":loud_sound: Play Mode",
-        value: repeatMode[queue.repeatMode],
+        name: ":loud_sound: Auto Play",
+        value: `${(player.metadata.autoplay) ? ":white_check_mark:" : ":negative_squared_cross_mark:"}`,
         inline: true,
+      },
+      {
+        name: "",
+        value: generateProgressBar(player),
+        inline: false,
       },
       {
         name: ":notes: Queue",
@@ -113,7 +120,23 @@ export default function (queue, initialIndex = 0) {
   return { embeds: [embed], components: [actionRow, actionRow2] };
 }
 
-export const parseDuration = (duration) => {
+export const generateProgressBar = (player) => {
+  const currentTime = ((!player.paused) ? Date.now() : player.metadata.trackStart.pausedTime) - player.metadata.trackStart.time;
+  const totalTime = player.queue.current.length;
+
+  const barLength = 18;
+  const barPosition = Math.floor((currentTime / totalTime) * barLength);
+  const barString = "▬".repeat(barPosition) + "🔘" + "▬".repeat(barLength - barPosition);
+
+  const progressBar = (player.queue.current.isStream) ? ":red_circle: **AO VIVO**"
+                    : `${parseDuration(currentTime)} | ${barString} | ${parseDuration(totalTime)}`;
+
+  return progressBar;
+};
+
+export const parseDuration = (duration, isSeconds = false) => {
+  duration = (isSeconds) ? duration : Math.floor(duration / 1000);
+
   const hours = Math.floor(duration / 3600);
   const minutes = Math.floor((duration - (hours * 3600)) / 60);
   const seconds = Math.floor(duration - (hours * 3600) - (minutes * 60));

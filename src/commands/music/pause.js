@@ -1,5 +1,3 @@
-import { useMainPlayer } from "discord-player";
-
 export const data = {
   name: "pause",
   description: "Pausa/retoma a música tocando atualmente",
@@ -14,12 +12,11 @@ export async function run(client, interaction) {
 
   const edit = (isLegacy) ? "edit" : "editReply";
 
-  const player = useMainPlayer();
-  const queue = player.nodes.get(interaction.guild);
-  if (!queue) return ((isLegacy) ? reply : interaction)[edit]("Não há música tocando no momento.");
+  const { player } = (client[interaction.guild.id]?.player) ? client[interaction.guild.id] : { player: null };;
+  if (!player) return ((isLegacy) ? reply : interaction)[edit]("Não há música tocando no momento.");
 
   try {
-    if (interaction.member.voice.channel.id !== queue.channel.id) {
+    if (interaction.member.voice.channel.id !== player.voiceId) {
       return ((isLegacy) ? reply : interaction)[edit]({
         content: "Você precisa estar no mesmo canal de voz que eu."
       });
@@ -28,7 +25,13 @@ export async function run(client, interaction) {
     return ((isLegacy) ? reply : interaction)[edit]({ content: "Você precisa estar conectado a um chat de voz!" });
   }
 
-  queue.node[queue.node.isPaused() ? "resume" : "pause"]();
+  if (!player.paused) {
+    player.metadata.trackStart.pausedTime = Date.now();
+  } else {
+    player.metadata.trackStart.time += (Date.now() - player.metadata.trackStart.pausedTime);
+  }
 
-  return ((isLegacy) ? reply : interaction)[edit]({ content: (queue.node.isPaused()) ? "Música pausada!" : "Música retomada!" });
+  player.pause(!player.paused);
+
+  return ((isLegacy) ? reply : interaction)[edit]({ content: (player.paused) ? "Música pausada!" : "Música retomada!" });
 }
