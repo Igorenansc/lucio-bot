@@ -1,4 +1,4 @@
-import store from "../../redux/store.js";
+import playerMessage from "../../utils/playerMessage.js";
 
 export const data = {
   name: "stop",
@@ -8,21 +8,27 @@ export const data = {
 
 export async function run(client, interaction) {
   const isLegacy = !interaction?.options;
-  const reply = (isLegacy) 
-    ? await interaction.reply({ content: 'Lúcio está pensando...'})
+  const reply = (isLegacy)
+    ? await interaction.reply({ content: "Lúcio está pensando..."})
     : await interaction.deferReply({ ephemeral: false, fetchReply: true });
-    
-  const edit = (isLegacy) ? 'edit' : 'editReply';
-  
-  const { connection, player } = store.getState();
 
-  // await interaction.guild.members.me.voice.disconnect();
+  const edit = (isLegacy) ? "edit" : "editReply";
 
-  if (player) player.stop();
-  if (!connection) return ((isLegacy) ? reply : interaction)[edit]({ content: "Sem conexão ativa no momento." });
+  const { player } = (client[interaction.guild.id]?.player) ? client[interaction.guild.id] : { player: null };
+  if (!player) return ((isLegacy) ? reply : interaction)[edit]("Não há músicas tocando no momento.")
 
-  connection.destroy();
-  await store.dispatch({ type: 'STOP_PLAYLIST' });
+  try {
+    if (interaction.member.voice.channel.id !== player.voiceId) {
+      return ((isLegacy) ? reply : interaction)[edit]({
+        content: "Você precisa estar no mesmo canal de voz que eu."
+      });
+    }
+  } catch (e) {
+    return ((isLegacy) ? reply : interaction)[edit]({ content: "Você precisa estar conectado a um chat de voz!" });
+  }
+
+  playerMessage.delete(player);
+  player.delete();
 
   return ((isLegacy) ? reply : interaction)[edit]({ content: "A fila foi limpa e o bot removido!" });
 }
