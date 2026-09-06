@@ -1,0 +1,25 @@
+{
+  "name": "Lucio",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "NODE_ENV=test LOG_LEVEL=silent DISCORD_TOKEN=test CLIENT_ID=test LAVALINK_URL=localhost:2333 LAVALINK_PASSWORD=test node --test",
+    "test:watch": "node --test --watch"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "type": "module",
+  "dependencies": {
+    "discord.js": "^14.27.0",
+    "dotenv": "^17.4.2",
+    "pino": "^10.3.1",
+    "shoukaku": "^4.3.0",
+    "youtubei.js": "^18.0.0"
+  },
+  "devDependencies": {
+    "pino-pretty": "^13.1.3"
+  }
+}

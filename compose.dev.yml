@@ -1,0 +1,13 @@
+services:
+  lucio:
+    environment:
+      LOG_LEVEL: debug
+
+    volumes:
+      - ./Lucio/src:/app/src
+      - ./Lucio/index.js:/app/index.js
+
+    command:
+      - node
+      - --watch
+      - index.js
