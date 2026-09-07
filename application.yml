@@ -6,6 +6,11 @@ lavalink:
   server:
     password: "${LAVALINK_PASSWORD}"
 
+    timeouts:
+      connectTimeoutMs: 10000
+      connectionRequestTimeoutMs: 10000
+      socketTimeoutMs: 10000
+
     sources:
       youtube: false
       bandcamp: false
@@ -37,6 +42,6 @@ plugins:
       refreshToken: "${YOUTUBE_OAUTH_REFRESH_TOKEN}"
 
     remoteCipher:
-      url: "http://yt-cipher:8001"
-      password: "${YT_CIPHER_TOKEN}"
+      url: "https://cipher.kikkia.dev/"
+      # password: "${YT_CIPHER_TOKEN}"
       userAgent: "Lucio"
