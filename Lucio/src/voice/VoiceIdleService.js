@@ -109,7 +109,7 @@ export default class VoiceIdleService {
 
     this.logger.info({ guildId }, 'Desconectando player por inatividade')
 
-    await this.playerManager.destroy(guildId)
+    await this.playerManager.destroy(guildId, 'voice-idle')
   }
 
   #hasListeners (channel) {

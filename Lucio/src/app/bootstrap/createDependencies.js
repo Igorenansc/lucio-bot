@@ -7,6 +7,10 @@ import { Connectors, Shoukaku } from 'shoukaku'
 
 import CommandManager from '../../discord/commands/CommandManager.js'
 
+import { registerCommands } from './registerCommands.js'
+
+import OwnerService from '../../discord/permissions/OwnerService.js'
+
 import PlayerMessageController from '../../discord/messages/player/PlayerMessageController.js'
 import PlayerControlHandler from '../../discord/messages/player/PlayerControlHandler.js'
 import QueueMessageHandler from '../../discord/messages/queue/QueueMessageHandler.js'
@@ -30,8 +34,14 @@ import SearchService from '../../music/search/SearchService.js'
 import PlayRequestService from '../../music/playback/PlayRequestService.js'
 
 import VoiceIdleService from '../../voice/VoiceIdleService.js'
+import VoiceStateService from '../../voice/VoiceStateService.js'
 
 import { config } from '../config/config.js'
+import { logger } from '../config/logger.js'
+
+const bootstrapLogger = logger.child({
+  component: 'Bootstrap'
+})
 
 export async function createDependencies () {
   const client = new Client({
@@ -43,6 +53,21 @@ export async function createDependencies () {
     config.lavalink.nodes,
     config.lavalink.options
   )
+
+  const ownerService = new OwnerService({
+    owners: config.owners
+  })
+
+  if (config.owners.length === 0) {
+    bootstrapLogger.warn(
+      'OWNERS_ID não configurado; comandos de dono ficarão indisponíveis.'
+    )
+  } else {
+    bootstrapLogger.info(
+      { count: config.owners.length },
+      'Owners configurados'
+    )
+  }
 
   // Providers
   const youtubeProvider = await YouTubeRecommendationProvider.create()
@@ -71,7 +96,11 @@ export async function createDependencies () {
     shoukaku,
     youtubeProvider,
     playerMessageController,
-    trackResolver
+    trackResolver,
+    {
+      voiceCloseGraceMs: config.voice.closeGraceMs,
+      watchdogIntervalMs: config.voice.watchdogIntervalMs
+    }
   )
 
   const playRequestService = new PlayRequestService({
@@ -85,12 +114,22 @@ export async function createDependencies () {
     timeout: config.voice.idleTimeout
   })
 
+  const voiceStateService = new VoiceStateService({
+    client,
+    playerManager,
+    voiceIdleService
+  })
+
+  playerManager.startWatchdog()
+
   // Commands
   const commandManager = new CommandManager({
     playRequestService,
     autocompleteService,
     queueMessageService,
-    playerManager
+    playerManager,
+    ownerService,
+    registerCommands
   })
 
   await commandManager.loadFrom(getCommandsDirectory())
@@ -120,10 +159,12 @@ export async function createDependencies () {
 
     commandManager,
     playerManager,
+    ownerService,
 
     interactionRouter,
 
-    voiceIdleService
+    voiceIdleService,
+    voiceStateService
   }
 }
 

@@ -513,4 +513,57 @@ describe('PlayRequestService', () => {
       'A playlist **Discovery** com **3** músicas foi adicionada!'
     )
   })
+
+  test('reconcilia o player depois do deferReply', async () => {
+    const player = createPlayerMock()
+
+    const { interaction } = createCommandInteraction()
+
+    const { service, playerManager } = createService({
+      player,
+      searchResult: {
+        type: 'track',
+        tracks: [createTrack('A')]
+      }
+    })
+
+    await service.execute({
+      interaction,
+      query: 'track'
+    })
+
+    assert.deepEqual(playerManager.calls.reconcile, ['guild-1'])
+  })
+
+  test('responde erro quando a busca falha depois do deferReply', async () => {
+    const playerManager = createPlayerManagerMock(null)
+
+    const service = new PlayRequestService({
+      playerManager,
+
+      searchService: {
+        async search () {
+          throw new Error('Falha simulada')
+        }
+      }
+    })
+
+    const { interaction, calls } = createCommandInteraction()
+
+    const result = await service.execute({
+      interaction,
+      query: 'track'
+    })
+
+    assert.equal(result, false)
+
+    assert.equal(calls.deferReply, 1)
+
+    assert.equal(
+      calls.editReply[0],
+      'Ocorreu um erro ao processar sua música. Tente novamente.'
+    )
+
+    assert.equal(playerManager.calls.create.length, 0)
+  })
 })

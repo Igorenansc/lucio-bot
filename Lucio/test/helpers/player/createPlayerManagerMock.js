@@ -3,6 +3,7 @@ import { createPlayerMock } from './createPlayerMock.js'
 export function createPlayerManagerMock (player = null) {
   const calls = {
     get: [],
+    reconcile: [],
     create: [],
     destroy: []
   }
@@ -14,6 +15,12 @@ export function createPlayerManagerMock (player = null) {
 
     get (guildId) {
       calls.get.push(guildId)
+
+      return currentPlayer
+    },
+
+    async reconcile (guildId) {
+      calls.reconcile.push(guildId)
 
       return currentPlayer
     },
@@ -30,6 +37,12 @@ export function createPlayerManagerMock (player = null) {
 
     async destroy (guildId) {
       calls.destroy.push(guildId)
+
+      const existed = Boolean(currentPlayer)
+
+      currentPlayer = null
+
+      return existed
     },
 
     get currentPlayer () {

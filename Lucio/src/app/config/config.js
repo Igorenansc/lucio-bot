@@ -6,7 +6,9 @@ const {
 
   LAVALINK_URL,
   LAVALINK_PASSWORD,
-  LAVALINK_SECURE
+  LAVALINK_SECURE,
+
+  OWNERS_ID
 } = process.env
 
 const requiredVariables = {
@@ -25,6 +27,14 @@ export const config = Object.freeze({
     token: DISCORD_TOKEN,
     clientId: CLIENT_ID
   },
+
+  /*
+   * IDs com acesso elevado ao bot.
+   *
+   * Aceita vírgula, ponto e vírgula, espaço ou quebra de linha
+   * como separador: 123,456  123;456  123 456
+   */
+  owners: parseIdList(OWNERS_ID),
 
   lavalink: {
     nodes: [
@@ -55,5 +65,26 @@ export const config = Object.freeze({
   },
 
   // Tempo em milisegundos pro bot sair de um call onde esteja sozinho.
-  voice: { idleTimeout: 10_000 }
+  voice: {
+    idleTimeout: 10_000,
+
+    // Espera antes de decidir se um WebSocketClosedEvent foi movimento
+    // de canal/troca de região ou uma desconexão de verdade.
+    closeGraceMs: 1_500,
+
+    // Intervalo do watchdog que reconcilia players com o estado real
+    // das conexões do Shoukaku.
+    watchdogIntervalMs: 30_000
+  }
 })
+
+export function parseIdList (value = '') {
+  return Object.freeze([
+    ...new Set(
+      String(value)
+        .split(/[\s,;]+/)
+        .map(item => item.trim())
+        .filter(Boolean)
+    )
+  ])
+}

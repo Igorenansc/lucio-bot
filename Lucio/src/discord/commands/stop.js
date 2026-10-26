@@ -1,4 +1,8 @@
-import { MessageFlags, SlashCommandBuilder } from 'discord.js'
+import {
+  MessageFlags,
+  PermissionFlagsBits,
+  SlashCommandBuilder
+} from 'discord.js'
 
 import VoiceChannelValidator from '../../voice/VoiceChannelValidator.js'
 
@@ -6,7 +10,12 @@ export const data = new SlashCommandBuilder()
   .setName('stop')
   .setDescription('Encerra a reprodução e desconecta o bot.')
 
-export async function execute (interaction, { playerManager }) {
+export async function execute (interaction, { playerManager, ownerService }) {
+  /*
+   * get() devolve null e agenda a destruição de um player
+   * inconsistente. Assim /stop responde rápido mesmo quando
+   * o bot já está fora do canal de voz.
+   */
   const player = playerManager.get(interaction.guildId)
 
   if (!player) {
@@ -21,15 +30,25 @@ export async function execute (interaction, { playerManager }) {
   const voiceValidation = await VoiceChannelValidator.sameChannel(interaction)
 
   if (!voiceValidation.valid) {
-    await interaction.reply({
-      content: voiceValidation.message,
-      flags: MessageFlags.Ephemeral
-    })
+    /*
+     * Se o bot foi movido para outro canal, um moderador ou um
+     * dono do bot ainda precisa conseguir encerrar a reprodução.
+     */
+    const canForce =
+      ownerService?.isOwner(interaction.user.id) ||
+      interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)
 
-    return
+    if (!canForce) {
+      await interaction.reply({
+        content: voiceValidation.message,
+        flags: MessageFlags.Ephemeral
+      })
+
+      return
+    }
   }
 
-  await playerManager.destroy(interaction.guildId)
+  await playerManager.destroy(interaction.guildId, 'stop-command')
 
   await interaction.reply('Reprodução encerrada.')
 }

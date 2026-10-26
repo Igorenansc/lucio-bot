@@ -7,7 +7,8 @@ export function createCommandInteraction ({
   displayName = 'Test User',
   options = {},
   voicePermissionsDenied = [],
-  textPermissionsDenied = []
+  textPermissionsDenied = [],
+  memberPermissions = null
 } = {}) {
   const calls = {
     reply: [],
@@ -89,6 +90,8 @@ export function createCommandInteraction ({
     },
 
     member,
+
+    memberPermissions,
 
     guild,
 

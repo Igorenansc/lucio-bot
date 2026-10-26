@@ -156,6 +156,26 @@ export default class LucioPlayer extends EventEmitter {
         await this.#handleRecoveryError(error, data.track ?? this.currentTrack)
       }
     })
+
+    /*
+     * A conexão de voz do Lavalink fechou.
+     *
+     * Isso também acontece em movimento de canal/troca de região,
+     * então o PlayerManager decide, depois de um grace period, se
+     * deve destruir ou apenas atualizar a posição.
+     */
+    this.engine.on('closed', data => {
+      this.logger.warn(
+        {
+          code: data?.code,
+          reason: data?.reason,
+          byRemote: data?.byRemote
+        },
+        'Conexão de voz fechada'
+      )
+
+      this.emit('connectionClosed', data)
+    })
   }
 
   #stateChanged (type) {

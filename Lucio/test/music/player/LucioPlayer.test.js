@@ -739,4 +739,35 @@ describe('LucioPlayer', () => {
     )
     assert.equal(stateChanges.filter(event => event.type === 'queue').length, 1)
   })
+
+  test('emite connectionClosed quando o engine fecha a conexão de voz', async () => {
+    const { player, engine } = createPlayer()
+
+    const track = createTrack('A')
+
+    await player.enqueue(track)
+
+    const events = []
+
+    player.on('connectionClosed', data => {
+      events.push(data)
+    })
+
+    const payload = {
+      code: 4006,
+      reason: 'move',
+      byRemote: true
+    }
+
+    engine.emit('closed', payload)
+
+    assert.deepEqual(events, [payload])
+
+    /*
+     * Quem decide se o player deve morrer é o PlayerManager,
+     * depois do grace period. O LucioPlayer não limpa o estado
+     * sozinho no closed.
+     */
+    assert.equal(player.currentTrack, track)
+  })
 })

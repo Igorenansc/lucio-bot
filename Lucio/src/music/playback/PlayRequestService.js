@@ -5,6 +5,12 @@ import VoicePermissionValidator from '../../discord/permissions/VoicePermissionV
 
 import { formatDuration } from '../../utils/formatDuration.js'
 
+import { logger } from '../../app/config/logger.js'
+
+const playRequestLogger = logger.child({
+  component: 'PlayRequestService'
+})
+
 export default class PlayRequestService {
   constructor ({ playerManager, searchService }) {
     this.playerManager = playerManager
@@ -12,6 +18,11 @@ export default class PlayRequestService {
   }
 
   async execute ({ interaction, query }) {
+    /*
+     * get() já devolve null e agenda a destruição de um player
+     * inconsistente. Isso é síncrono, então a validação de canal
+     * e o deferReply não ficam presos em um teardown remoto.
+     */
     let player = this.playerManager.get(interaction.guildId)
 
     const voiceValidation = player
@@ -45,46 +56,77 @@ export default class PlayRequestService {
 
     await interaction.deferReply()
 
-    const result = await this.searchService.search(query)
+    try {
+      /*
+       * Agora que a interação já foi confirmada, podemos esperar
+       * a limpeza de um fantasma sem estourar o timeout de 3 s.
+       */
+      player = await this.playerManager.reconcile(interaction.guildId)
 
-    if (
-      result.type === 'empty' ||
-      result.type === 'error' ||
-      result.tracks.length === 0
-    ) {
-      await interaction.editReply('Não encontrei nenhuma música.')
+      const result = await this.searchService.search(query)
+
+      if (
+        result.type === 'empty' ||
+        result.type === 'error' ||
+        result.tracks.length === 0
+      ) {
+        await interaction.editReply('Não encontrei nenhuma música.')
+
+        return false
+      }
+
+      if (!player) {
+        player = await this.playerManager.create({
+          guildId: interaction.guildId,
+          channelId: voiceValidation.channel.id,
+          textChannel: interaction.channel,
+          shardId: interaction.guild.shardId
+        })
+      }
+
+      if (result.type === 'playlist') {
+        await this.#enqueuePlaylist(player, result, interaction)
+
+        return true
+      }
+
+      const track = this.#addRequester(result.tracks[0], interaction)
+
+      await player.enqueue(track)
+
+      const duration = track.info.isStream
+        ? 'AO VIVO'
+        : formatDuration(track.info.length)
+
+      await interaction.editReply(
+        `**${track.info.title} - [${duration}]** adicionada!`
+      )
+
+      return true
+    } catch (error) {
+      playRequestLogger.error(
+        {
+          err: error,
+          guildId: interaction.guildId,
+          userId: interaction.user.id,
+          query
+        },
+        'Erro ao processar pedido de reprodução'
+      )
+
+      try {
+        await interaction.editReply(
+          'Ocorreu um erro ao processar sua música. Tente novamente.'
+        )
+      } catch (replyError) {
+        playRequestLogger.error(
+          { err: replyError, guildId: interaction.guildId },
+          'Não foi possível responder ao erro de reprodução'
+        )
+      }
 
       return false
     }
-
-    if (!player) {
-      player = await this.playerManager.create({
-        guildId: interaction.guildId,
-        channelId: voiceValidation.channel.id,
-        textChannel: interaction.channel,
-        shardId: interaction.guild.shardId
-      })
-    }
-
-    if (result.type === 'playlist') {
-      await this.#enqueuePlaylist(player, result, interaction)
-
-      return true
-    }
-
-    const track = this.#addRequester(result.tracks[0], interaction)
-
-    await player.enqueue(track)
-
-    const duration = track.info.isStream
-      ? 'AO VIVO'
-      : formatDuration(track.info.length)
-
-    await interaction.editReply(
-      `**${track.info.title} - [${duration}]** adicionada!`
-    )
-
-    return true
   }
 
   async #enqueuePlaylist (player, result, interaction) {

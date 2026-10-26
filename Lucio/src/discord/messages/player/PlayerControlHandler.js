@@ -17,8 +17,8 @@ export default class PlayerControlHandler {
 
     if (!player) {
       try {
-        interaction.message.delete()
-      } catch (error) {
+        await interaction.message.delete()
+      } catch {
         await interaction.reply({
           content: 'Não existe um player ativo.',
           flags: MessageFlags.Ephemeral
@@ -129,7 +129,7 @@ export default class PlayerControlHandler {
   async #stop (interaction) {
     await interaction.deferUpdate()
 
-    await this.playerManager.destroy(interaction.guildId)
+    await this.playerManager.destroy(interaction.guildId, 'button-stop')
   }
 
   async #volume (interaction, player, toIncrease = true) {

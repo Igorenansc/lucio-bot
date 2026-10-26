@@ -44,6 +44,8 @@ import {
 
 import { RepeatMode } from '../../../src/music/player/RepeatMode.js'
 
+import OwnerService from '../../../src/discord/permissions/OwnerService.js'
+
 import { createCommandInteraction } from '../../helpers/discord/createCommandInteraction.js'
 
 import { createPlayerMock } from '../../helpers/player/createPlayerMock.js'
@@ -228,6 +230,69 @@ describe('Comandos de controle', () => {
 
     await executeStop(interaction, {
       playerManager
+    })
+
+    assert.deepEqual(playerManager.calls.destroy, ['guild-1'])
+
+    assert.deepEqual(playerManager.calls.get, ['guild-1'])
+  })
+
+  test('/stop responde quando get não encontra player saudável', async () => {
+    const playerManager = createPlayerManagerMock(null)
+
+    const { interaction, calls } = createCommandInteraction()
+
+    await executeStop(interaction, {
+      playerManager
+    })
+
+    assert.deepEqual(playerManager.calls.get, ['guild-1'])
+
+    assert.equal(playerManager.calls.destroy.length, 0)
+
+    assert.equal(
+      calls.reply[0].content,
+      'Não existe um player ativo neste servidor.'
+    )
+  })
+
+  test('/stop permite ManageGuild encerrar de outro canal', async () => {
+    const player = createPlayerMock()
+
+    const playerManager = createPlayerManagerMock(player)
+
+    const { interaction } = createCommandInteraction({
+      userChannelId: 'voice-2',
+      botChannelId: 'voice-1',
+      memberPermissions: {
+        has: () => true
+      }
+    })
+
+    await executeStop(interaction, {
+      playerManager
+    })
+
+    assert.deepEqual(playerManager.calls.destroy, ['guild-1'])
+  })
+
+  test('/stop permite dono encerrar de outro canal', async () => {
+    const player = createPlayerMock()
+
+    const playerManager = createPlayerManagerMock(player)
+
+    const ownerService = new OwnerService({
+      owners: ['user-1']
+    })
+
+    const { interaction } = createCommandInteraction({
+      userChannelId: 'voice-2',
+      botChannelId: 'voice-1'
+    })
+
+    await executeStop(interaction, {
+      playerManager,
+      ownerService
     })
 
     assert.deepEqual(playerManager.calls.destroy, ['guild-1'])

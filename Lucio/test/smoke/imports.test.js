@@ -26,6 +26,7 @@ const modules = [
   '../../src/discord/commands/repeat.js',
   '../../src/discord/commands/queue.js',
   '../../src/discord/commands/stop.js',
+  '../../src/discord/commands/sync.js',
   '../../src/discord/commands/shuffle.js',
 
   '../../src/discord/interactions/InteractionRouter.js',
@@ -39,6 +40,7 @@ const modules = [
 
   '../../src/discord/permissions/VoicePermissionValidator.js',
   '../../src/discord/permissions/TextPermissionValidator.js',
+  '../../src/discord/permissions/OwnerService.js',
   /*
    * Music
    */
@@ -64,6 +66,7 @@ const modules = [
    * Voice
    */
   '../../src/voice/VoiceIdleService.js',
+  '../../src/voice/VoiceStateService.js',
   '../../src/voice/VoiceChannelValidator.js',
 
   /*

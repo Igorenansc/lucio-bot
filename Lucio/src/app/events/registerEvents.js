@@ -7,14 +7,14 @@ import { logger } from "../config/logger.js";
 const discordLogger = logger.child({ component: "Discord" });
 const lavalinkLogger = logger.child({ component: "Lavalink" });
 
-export function registerEvents({ client, shoukaku, commandManager, interactionRouter, voiceIdleService }) {
+export function registerEvents({ client, shoukaku, commandManager, interactionRouter, voiceStateService }) {
     registerShoukakuEvents(shoukaku);
 
     registerDiscordEvents({
         client,
         commandManager,
         interactionRouter,
-        voiceIdleService,
+        voiceStateService,
     });
 }
 
@@ -43,7 +43,7 @@ function registerDiscordEvents({
     client,
     commandManager,
     interactionRouter,
-    voiceIdleService,
+    voiceStateService,
 }) {
     client.once("clientReady", async () => {
         discordLogger.info(
@@ -76,10 +76,7 @@ function registerDiscordEvents({
 
 
     client.on("voiceStateUpdate", (oldState, newState) => {
-        try {
-            voiceIdleService.handle(oldState, newState);
-
-        } catch (error) {
+        voiceStateService.handle(oldState, newState).catch(error => {
             discordLogger.error(
                 {
                     err: error,
@@ -87,7 +84,7 @@ function registerDiscordEvents({
                 },
                 "Erro ao processar voiceStateUpdate"
             );
-        }
+        });
     });
 }
 
