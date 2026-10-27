@@ -70,7 +70,10 @@ function createPlayerMessageController () {
   }
 }
 
-function createManager (shoukaku, { voiceCloseGraceMs = 1_000 } = {}) {
+function createManager (
+  shoukaku,
+  { voiceCloseGraceMs = 1_000, nodeDownGraceMs = 60_000 } = {}
+) {
   const playerMessageController = createPlayerMessageController()
 
   const manager = new PlayerManager(
@@ -84,7 +87,8 @@ function createManager (shoukaku, { voiceCloseGraceMs = 1_000 } = {}) {
     },
     {
       voiceCloseGraceMs,
-      watchdogIntervalMs: 60_000
+      watchdogIntervalMs: 60_000,
+      nodeDownGraceMs
     }
   )
 
@@ -357,5 +361,43 @@ describe('PlayerManager', () => {
     assert.equal(manager.players.has(GUILD_ID), false)
 
     assert.deepEqual(shoukaku.calls.leave, [GUILD_ID])
+  })
+
+  test('watchdog destrói player com node desconectado após grace', async () => {
+    const shoukaku = createShoukaku()
+
+    const { manager } = createManager(shoukaku, {
+      nodeDownGraceMs: 0
+    })
+
+    await manager.create(createOptions())
+
+    shoukaku.players.get(GUILD_ID).node = {
+      state: 0
+    }
+
+    await manager.sweep()
+
+    assert.equal(manager.players.has(GUILD_ID), false)
+
+    assert.deepEqual(shoukaku.calls.leave, [GUILD_ID])
+  })
+
+  test('volume persiste entre players da mesma guild', async () => {
+    const shoukaku = createShoukaku()
+
+    const { manager } = createManager(shoukaku)
+
+    const first = await manager.create(createOptions())
+
+    await first.setVolume(42)
+
+    await manager.destroy(GUILD_ID, 'test-volume')
+
+    const second = await manager.create(createOptions())
+
+    assert.equal(second.volume, 42)
+
+    assert.equal(shoukaku.players.get(GUILD_ID).volume, 42)
   })
 })

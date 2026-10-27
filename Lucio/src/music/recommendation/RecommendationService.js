@@ -11,6 +11,8 @@ export default class RecommendationService {
   }
 
   async getNext (track, recentTracks = []) {
+    if (!this.youtubeProvider) return null
+
     if (track.info.sourceName !== 'youtube' || !track.info.identifier) {
       return null
     }

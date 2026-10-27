@@ -4,6 +4,8 @@ import assert from 'node:assert/strict'
 
 import SearchService from '../../../src/music/search/SearchService.js'
 
+import { SearchType } from '../../../src/music/search/SearchType.js'
+
 function createShoukaku (resolveResult) {
   const calls = []
 
@@ -234,5 +236,57 @@ describe('SearchService', () => {
       () => service.search('teste'),
       /Nenhum node Lavalink disponível/
     )
+  })
+
+  test('busca playlist por texto usando youtubei', async () => {
+    const playlist = {
+      type: 'playlist',
+      playlist: { name: 'Discovery' },
+      tracks: [{ info: { identifier: 'A' } }]
+    }
+
+    const { shoukaku, calls } = createShoukaku(null)
+
+    const playlistProvider = createPlaylistProvider(playlist)
+
+    const searchCalls = []
+
+    const searchProvider = {
+      async search (query, type, limit) {
+        searchCalls.push({ query, type, limit })
+
+        return [{ playlistId: 'PL1' }]
+      }
+    }
+
+    const service = new SearchService(
+      shoukaku,
+      playlistProvider,
+      searchProvider
+    )
+
+    const result = await service.search('discovery', SearchType.PLAYLIST)
+
+    assert.equal(calls.length, 0)
+    assert.deepEqual(searchCalls, [
+      {
+        query: 'discovery',
+        type: SearchType.PLAYLIST,
+        limit: 1
+      }
+    ])
+    assert.deepEqual(playlistProvider.calls, ['PL1'])
+    assert.equal(result, playlist)
+  })
+
+  test('playlist por texto sem provider retorna empty', async () => {
+    const { shoukaku } = createShoukaku(null)
+
+    const service = new SearchService(shoukaku, null, null)
+
+    const result = await service.search('discovery', SearchType.PLAYLIST)
+
+    assert.equal(result.type, 'empty')
+    assert.deepEqual(result.tracks, [])
   })
 })

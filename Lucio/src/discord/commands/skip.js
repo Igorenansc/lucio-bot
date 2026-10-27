@@ -1,10 +1,11 @@
-import { MessageFlags, SlashCommandBuilder } from 'discord.js'
+import { MessageFlags, InteractionContextType, SlashCommandBuilder } from 'discord.js'
 
 import VoiceChannelValidator from '../../voice/VoiceChannelValidator.js'
 
 export const data = new SlashCommandBuilder()
   .setName('skip')
   .setDescription('Pula a música atual ou uma quantidade específica.')
+  .setContexts(InteractionContextType.Guild)
   .addIntegerOption(option =>
     option
       .setName('qtd')

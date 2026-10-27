@@ -30,7 +30,7 @@ export default class PlayerMessageService {
 
   async createOrUpdate (guildId, channel, player) {
     return await this.#runExclusive(guildId, async () => {
-      if (!player.currentTrack) return null
+      if (!player.currentTrack && !player.pendingTrack) return null
       if (!this.#canUseChannel(guildId, channel)) return null
 
       const payload = this.#buildMessage(player)
@@ -83,7 +83,7 @@ export default class PlayerMessageService {
        * a antiga foi limpa,
        * mas não criamos outra.
        */
-      if (!player.currentTrack) {
+      if (!player.currentTrack && !player.pendingTrack) {
         return null
       }
 
@@ -130,7 +130,11 @@ export default class PlayerMessageService {
   }
 
   #buildMessage (player) {
-    const track = player.currentTrack
+    const track = player.pendingTrack ?? player.currentTrack
+
+    const loading = Boolean(player.pendingTrack)
+
+    const volume = Number.isFinite(player.volume) ? player.volume : 0
 
     const playPauseButton = new ButtonBuilder()
       .setCustomId('music_play_pause')
@@ -180,17 +184,22 @@ export default class PlayerMessageService {
       volumeDownButton
     )
 
+    const description = loading
+      ? `⏳ **Carregando...** • 🔊 ${volume}%`
+      : track.info.isStream
+        ? `:red_circle: **AO VIVO** • 🔊 ${volume}%`
+        : `\`[0:00] / [${formatDuration(track.info.length ?? 0)}]\` • 🔊 ${volume}%`
+
     const embed = new EmbedBuilder()
       .setAuthor({
         name: track.info.author
       })
       .setTitle(track.info.title)
-      .setURL(track.info.uri)
-      .setDescription(
-        track.info.isStream
-          ? ':red_circle: **AO VIVO**'
-          : `\`[0:00] / [${formatDuration(track.info.length)}]\``
-      )
+      .setDescription(description)
+
+    if (track.info.uri) {
+      embed.setURL(track.info.uri)
+    }
 
     if (track.info.artworkUrl) {
       embed.setThumbnail(track.info.artworkUrl)

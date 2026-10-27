@@ -50,7 +50,11 @@ export const config = Object.freeze({
       resume: true,
       resumeTimeout: 30,
       reconnectTries: 5,
-      reconnectInterval: 5
+      reconnectInterval: 5,
+
+      // Evita que um stop/leave em node morto bloqueie o lifecycle
+      // da guild por 60 s (default do Shoukaku).
+      restTimeout: 10
     }
   },
 
@@ -61,7 +65,27 @@ export const config = Object.freeze({
     minQueryLength: 3,
     debounceMs: 250,
     cacheTtl: 30_000,
-    limit: 10
+    limit: 10,
+    timeoutMs: 2_000,
+    maxCacheEntries: 500
+  },
+
+  player: {
+    // Volume inicial de uma guild que ainda não tem setting.
+    defaultVolume: 10,
+
+    // Quantidade máxima de faixas mantidas para /previous e autoplay.
+    historyLimit: 50,
+
+    // Tempo máximo entre o playTrack aceito e o evento start.
+    startTimeoutMs: 10_000,
+
+    // Tempo máximo para stop/leave durante o teardown.
+    teardownTimeoutMs: 12_000,
+
+    // Tempo de tolerância com o node do Lavalink desconectado
+    // antes de o watchdog destruir os players daquela guild.
+    nodeDownGraceMs: 60_000
   },
 
   // Tempo em milisegundos pro bot sair de um call onde esteja sozinho.
@@ -79,9 +103,14 @@ export const config = Object.freeze({
 })
 
 export function parseIdList (value = '') {
+  const normalized = String(value)
+    .replace(/^\s*\[/, '')
+    .replace(/\]\s*$/, '')
+    .replace(/["']/g, '')
+
   return Object.freeze([
     ...new Set(
-      String(value)
+      normalized
         .split(/[\s,;]+/)
         .map(item => item.trim())
         .filter(Boolean)

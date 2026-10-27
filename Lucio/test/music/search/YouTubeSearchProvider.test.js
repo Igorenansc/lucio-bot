@@ -2,193 +2,156 @@ import { describe, test } from 'node:test'
 
 import assert from 'node:assert/strict'
 
-import YouTubePlaylistProvider from '../../../src/music/search/YouTubePlaylistProvider.js'
+import YouTubeSearchProvider from '../../../src/music/search/YouTubeSearchProvider.js'
 
-function createYoutube (playlist) {
+import { SearchType } from '../../../src/music/search/SearchType.js'
+
+function createYoutube ({ videos = [], playlists = [] } = {}) {
   const calls = []
 
   return {
     calls,
 
-    async getPlaylist (playlistId) {
-      calls.push(playlistId)
-      return playlist
+    async search (query) {
+      calls.push(query)
+
+      return {
+        videos,
+        playlists
+      }
     }
   }
 }
 
-describe('YouTubePlaylistProvider', () => {
-  test('retorna null sem playlistId', async () => {
-    const youtube = createYoutube({})
+function createVideo (id, overrides = {}) {
+  return {
+    id,
+    title: { text: `Video ${id}` },
+    author: { name: 'Artist' },
+    duration: {
+      text: '4:09',
+      seconds: 249
+    },
+    ...overrides
+  }
+}
 
-    const provider = new YouTubePlaylistProvider(youtube)
+describe('YouTubeSearchProvider', () => {
+  test('não busca query vazia', async () => {
+    const youtube = createYoutube()
 
-    const result = await provider.getPlaylist(null)
+    const provider = new YouTubeSearchProvider(youtube)
 
-    assert.equal(result, null)
-
+    assert.deepEqual(await provider.search('   '), [])
     assert.equal(youtube.calls.length, 0)
   })
 
-  test('converte itens em tracks lazy', async () => {
+  test('mapeia vídeos e respeita o limite', async () => {
     const youtube = createYoutube({
-      info: {
-        title: 'Minha Playlist'
-      },
-
-      items: [
-        {
-          id: 'A',
-          title: {
-            text: 'Track A'
-          },
-          author: {
-            name: 'Artista A'
-          },
-          duration: {
-            text: '4:09'
-          }
-        }
-      ]
+      videos: [createVideo('A'), createVideo('B')]
     })
 
-    const provider = new YouTubePlaylistProvider(youtube)
+    const provider = new YouTubeSearchProvider(youtube)
 
-    const result = await provider.getPlaylist('PL123')
+    const result = await provider.search('daft punk', SearchType.VIDEO, 1)
 
-    assert.equal(result.type, 'playlist')
-
-    assert.equal(result.playlist.name, 'Minha Playlist')
-
-    assert.equal(result.tracks.length, 1)
-
-    const track = result.tracks[0]
-
-    assert.equal(track.encoded, null)
-
-    assert.equal(track.info.identifier, 'A')
-
-    assert.equal(track.info.title, 'Track A')
-
-    assert.equal(track.info.author, 'Artista A')
-
-    assert.equal(track.info.length, 249_000)
-
-    assert.equal(track.info.uri, 'https://www.youtube.com/watch?v=A')
-
-    assert.equal(track.userData.unresolved, true)
+    assert.deepEqual(result, [
+      {
+        videoId: 'A',
+        title: 'Video A',
+        author: 'Artist',
+        duration: '4:09',
+        durationSeconds: 249
+      }
+    ])
   })
 
-  test('ignora itens sem videoId', async () => {
+  test('usa fallback quando vídeo não tem metadados', async () => {
     const youtube = createYoutube({
-      info: {
-        title: 'Playlist'
-      },
-
-      items: [
-        {
-          title: {
-            text: 'Inválida'
-          }
-        },
-        {
-          id: 'B',
-
-          title: {
-            text: 'Válida'
-          },
-          duration: {
-            text: '3:00'
-          }
-        }
-      ]
-    })
-
-    const provider = new YouTubePlaylistProvider(youtube)
-
-    const result = await provider.getPlaylist('PL123')
-
-    assert.equal(result.tracks.length, 1)
-
-    assert.equal(result.tracks[0].info.identifier, 'B')
-  })
-
-  test('usa autor padrão quando ausente', async () => {
-    const youtube = createYoutube({
-      info: {
-        title: 'Playlist'
-      },
-
-      items: [
+      videos: [
         {
           id: 'A',
-          title: {
-            text: 'Track'
-          },
-          duration: {
-            text: '1:00'
-          }
+          title: 'Título cru',
+          author: null,
+          duration: null
         }
       ]
     })
 
-    const provider = new YouTubePlaylistProvider(youtube)
+    const provider = new YouTubeSearchProvider(youtube)
 
-    const result = await provider.getPlaylist('PL123')
+    const [video] = await provider.search('x', SearchType.VIDEO)
 
-    assert.equal(result.tracks[0].info.author, 'Desconhecido')
+    assert.equal(video.title, 'Título cru')
+    assert.equal(video.author, 'Desconhecido')
+    assert.equal(video.duration, null)
   })
 
-  test('converte duração HH:MM:SS corretamente', async () => {
+  test('mapeia playlists e extrai autor do metadata', async () => {
     const youtube = createYoutube({
-      info: {
-        title: 'Playlist'
-      },
-
-      items: [
+      playlists: [
         {
-          id: 'A',
-          title: {
-            text: 'Long Track'
-          },
-          duration: {
-            text: '1:02:03'
+          content_id: 'PL1',
+          metadata: {
+            title: { text: 'Discovery' },
+            metadata: {
+              metadata_rows: [
+                {
+                  metadata_parts: [{ text: { text: 'Daft Punk' } }]
+                }
+              ]
+            }
           }
         }
       ]
     })
 
-    const provider = new YouTubePlaylistProvider(youtube)
+    const provider = new YouTubeSearchProvider(youtube)
 
-    const result = await provider.getPlaylist('PL123')
+    const result = await provider.search('discovery', SearchType.PLAYLIST)
 
-    assert.equal(result.tracks[0].info.length, 3_723_000)
+    assert.deepEqual(result, [
+      {
+        playlistId: 'PL1',
+        title: 'Discovery',
+        author: 'Daft Punk'
+      }
+    ])
   })
 
-  test('usa zero quando duração é inválida', async () => {
+  test('ignora playlist sem id', async () => {
     const youtube = createYoutube({
-      info: {
-        title: 'Playlist'
-      },
-
-      items: [
+      playlists: [
         {
-          id: 'A',
-          title: {
-            text: 'Track'
-          },
-
-          duration: {
-            text: 'invalid'
-          }
+          title: { text: 'Sem id' }
         }
       ]
     })
 
-    const provider = new YouTubePlaylistProvider(youtube)
+    const provider = new YouTubeSearchProvider(youtube)
 
-    const result = await provider.getPlaylist('PL123')
+    assert.deepEqual(
+      await provider.search('x', SearchType.PLAYLIST),
+      []
+    )
+  })
 
-    assert.equal(result.tracks[0].info.length, 0)
+  test('usa playlist.id como fallback de content_id', async () => {
+    const youtube = createYoutube({
+      playlists: [
+        {
+          id: 'PL2',
+          title: { text: 'Mix' },
+          author: { name: 'Autor' }
+        }
+      ]
+    })
+
+    const provider = new YouTubeSearchProvider(youtube)
+
+    const [playlist] = await provider.search('mix', SearchType.PLAYLIST)
+
+    assert.equal(playlist.playlistId, 'PL2')
+    assert.equal(playlist.author, 'Autor')
   })
 })

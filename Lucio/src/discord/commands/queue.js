@@ -1,10 +1,11 @@
-import { MessageFlags, SlashCommandBuilder } from 'discord.js'
+import { MessageFlags, InteractionContextType, SlashCommandBuilder } from 'discord.js'
 
 import TextPermissionValidator from '../permissions/TextPermissionValidator.js'
 
 export const data = new SlashCommandBuilder()
   .setName('queue')
   .setDescription('Mostra a fila de reprodução.')
+  .setContexts(InteractionContextType.Guild)
 
 export async function execute (
   interaction,

@@ -24,4 +24,11 @@ describe('parseIdList', () => {
     assert.deepEqual(parseIdList(''), [])
     assert.deepEqual(parseIdList(undefined), [])
   })
+
+  test('aceita formato de array com colchetes e aspas', () => {
+    assert.deepEqual(
+      parseIdList('[123456789012345678, "234567890123456789"]'),
+      ['123456789012345678', '234567890123456789']
+    )
+  })
 })

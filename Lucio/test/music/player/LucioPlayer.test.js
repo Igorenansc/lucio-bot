@@ -770,4 +770,212 @@ describe('LucioPlayer', () => {
      */
     assert.equal(player.currentTrack, track)
   })
+
+  test('falha no playTrack não deixa currentTrack fantasma', async () => {
+    const { player, engine } = createPlayer()
+
+    engine.playTrack = async () => {
+      throw new Error('falha simulada')
+    }
+
+    await assert.rejects(
+      () => player.play(createTrack('A')),
+      /falha simulada/
+    )
+
+    assert.equal(player.currentTrack, null)
+    assert.equal(player.pendingTrack, null)
+  })
+
+  test('emite trackLoading antes de confirmar a faixa', async () => {
+    const { player } = createPlayer()
+
+    const loading = []
+
+    player.on('trackLoading', track => {
+      loading.push(track)
+    })
+
+    const track = createTrack('A')
+
+    await player.play(track)
+
+    assert.equal(loading.length, 1)
+    assert.equal(loading[0].info.identifier, 'A')
+    assert.equal(player.currentTrack, track)
+    assert.equal(player.pendingTrack, null)
+  })
+
+  test('loadFailed avança para a próxima faixa', async () => {
+    const { player, engine } = createPlayer()
+
+    player.setAutoplay(false)
+
+    const a = createTrack('A')
+    const b = createTrack('B')
+
+    await player.enqueue(a)
+    await player.enqueue(b)
+
+    engine.emit('end', {
+      track: a,
+      reason: 'loadFailed'
+    })
+
+    await flushEvents()
+
+    assert.equal(player.currentTrack, b)
+    assert.deepEqual(
+      player.history.map(track => track.info.identifier),
+      ['A']
+    )
+  })
+
+  test('end atrasado de faixa pulada não avança duas vezes', async () => {
+    const { player, engine } = createPlayer()
+
+    player.setAutoplay(false)
+
+    const a = createTrack('A')
+    const b = createTrack('B')
+    const c = createTrack('C')
+
+    await player.enqueue(a)
+    await player.enqueue(b)
+    await player.enqueue(c)
+
+    await player.skip()
+
+    assert.equal(player.currentTrack, b)
+
+    engine.emit('end', {
+      track: a,
+      reason: 'finished'
+    })
+
+    await flushEvents()
+
+    assert.equal(player.currentTrack, b)
+    assert.deepEqual(
+      player.queue.toArray().map(track => track.info.identifier),
+      ['C']
+    )
+  })
+
+  test('limita o histórico ao historyLimit', async () => {
+    const { player } = createPlayer()
+
+    player.setAutoplay(false)
+    player.historyLimit = 2
+
+    const a = createTrack('A')
+    const b = createTrack('B')
+    const c = createTrack('C')
+    const d = createTrack('D')
+
+    await player.enqueue(a)
+    await player.enqueue(b)
+    await player.enqueue(c)
+    await player.enqueue(d)
+
+    await player.skip()
+    await player.skip()
+    await player.skip()
+
+    assert.equal(player.currentTrack, d)
+    assert.deepEqual(
+      player.history.map(track => track.info.identifier),
+      ['B', 'C']
+    )
+  })
+
+  test('start promove a track pendente e limpa o loading', async () => {
+    const { player, engine } = createPlayer()
+
+    const a = createTrack('A')
+
+    await player.enqueue(a)
+
+    assert.equal(player.currentTrack, a)
+    assert.equal(player.pendingTrack, null)
+
+    const starts = []
+
+    player.on('trackStart', track => starts.push(track))
+
+    engine.emit('start', { track: a })
+
+    assert.deepEqual(starts, [a])
+    assert.equal(player.currentTrack, a)
+  })
+
+  test('start de track antiga não sobrescreve a transição atual', async () => {
+    const { player, engine } = createPlayer()
+
+    const a = createTrack('A')
+    const b = createTrack('B')
+
+    await player.play(a)
+    await player.play(b)
+
+    engine.emit('start', { track: a })
+
+    assert.equal(player.currentTrack, b)
+    assert.equal(player.startedTrackKey, null)
+  })
+
+  test('play concorrente não deixa a transição antiga sobrescrever a nova', async () => {
+    const { player, engine } = createPlayer()
+
+    const a = createTrack('A')
+    const b = createTrack('B')
+
+    let resolveA = null
+
+    engine.playTrack = payload => {
+      if (payload.track.encoded === a.encoded) {
+        return new Promise(resolve => {
+          resolveA = resolve
+        })
+      }
+
+      return Promise.resolve()
+    }
+
+    const playA = player.play(a)
+
+    await player.play(b)
+
+    resolveA?.()
+
+    await playA
+
+    assert.equal(player.currentTrack, b)
+  })
+
+  test('start timeout entra em idle em vez de ficar preso', async t => {
+    t.mock.timers.enable({
+      apis: ['setTimeout']
+    })
+
+    const { player } = createPlayer()
+
+    player.setAutoplay(false)
+
+    const a = createTrack('A')
+
+    await player.enqueue(a)
+
+    assert.equal(player.currentTrack, a)
+
+    t.mock.timers.tick(10_000)
+
+    await flushEvents()
+
+    assert.equal(player.currentTrack, null)
+    assert.deepEqual(
+      player.history.map(track => track.info.identifier),
+      ['A']
+    )
+  })
 })

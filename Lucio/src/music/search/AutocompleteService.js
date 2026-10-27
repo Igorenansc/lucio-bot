@@ -3,7 +3,14 @@ import { SearchType } from './SearchType.js'
 export default class AutocompleteService {
   constructor (
     searchProvider,
-    { minQueryLength = 3, debounceMs = 250, cacheTtl = 30_000, limit = 10 } = {}
+    {
+      minQueryLength = 3,
+      debounceMs = 250,
+      cacheTtl = 30_000,
+      limit = 10,
+      timeoutMs = 2_000,
+      maxCacheEntries = 500
+    } = {}
   ) {
     this.searchProvider = searchProvider
 
@@ -15,6 +22,10 @@ export default class AutocompleteService {
 
     this.limit = limit
 
+    this.timeoutMs = timeoutMs
+
+    this.maxCacheEntries = maxCacheEntries
+
     this.cache = new Map()
 
     this.generations = new Map()
@@ -23,6 +34,8 @@ export default class AutocompleteService {
   }
 
   async search (key, query, type = SearchType.VIDEO) {
+    if (!this.searchProvider) return []
+
     const normalized = query?.trim().toLowerCase()
 
     if (!normalized || normalized.length < this.minQueryLength) {
@@ -56,7 +69,10 @@ export default class AutocompleteService {
     let request = this.pending.get(cacheKey)
 
     if (!request) {
-      request = this.searchProvider.search(normalized, type, this.limit)
+      request = this.#withTimeout(
+        this.searchProvider.search(normalized, type, this.limit),
+        this.timeoutMs
+      )
 
       this.pending.set(cacheKey, request)
     }
@@ -70,6 +86,9 @@ export default class AutocompleteService {
         expiresAt: Date.now() + this.cacheTtl
       })
 
+      this.#trimMap(this.cache)
+      this.#trimMap(this.generations)
+
       if (this.generations.get(key) !== generation) {
         return []
       }
@@ -79,6 +98,34 @@ export default class AutocompleteService {
       if (this.pending.get(cacheKey) === request) {
         this.pending.delete(cacheKey)
       }
+    }
+  }
+
+  #withTimeout (promise, ms) {
+    if (!ms) return promise
+
+    let timer = null
+
+    const timeout = new Promise((_, reject) => {
+      timer = setTimeout(() => {
+        reject(new Error('Timeout na busca de autocomplete.'))
+      }, ms)
+
+      timer.unref?.()
+    })
+
+    return Promise.race([promise, timeout]).finally(() => {
+      if (timer) clearTimeout(timer)
+    })
+  }
+
+  #trimMap (map, protectedKey = null) {
+    while (map.size > this.maxCacheEntries) {
+      const oldestKey = map.keys().next().value
+
+      if (oldestKey === protectedKey) break
+
+      map.delete(oldestKey)
     }
   }
 

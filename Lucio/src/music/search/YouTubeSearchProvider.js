@@ -1,4 +1,4 @@
-import { Innertube } from 'youtubei.js'
+import { getYouTubeClient } from './YouTubeClient.js'
 
 import { SearchType } from './SearchType.js'
 
@@ -8,7 +8,7 @@ export default class YouTubeSearchProvider {
   }
 
   static async create () {
-    const youtube = await Innertube.create()
+    const youtube = await getYouTubeClient()
 
     return new YouTubeSearchProvider(youtube)
   }

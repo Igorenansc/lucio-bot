@@ -1,10 +1,11 @@
-import { MessageFlags, SlashCommandBuilder } from 'discord.js'
+import { MessageFlags, InteractionContextType, SlashCommandBuilder } from 'discord.js'
 
 import VoiceChannelValidator from '../../voice/VoiceChannelValidator.js'
 
 export const data = new SlashCommandBuilder()
   .setName('pause')
   .setDescription('Pausa a música atual.')
+  .setContexts(InteractionContextType.Guild)
 
 export async function execute (interaction, { playerManager }) {
   const player = playerManager.get(interaction.guildId)

@@ -17,7 +17,7 @@ export default class PlayRequestService {
     this.searchService = searchService
   }
 
-  async execute ({ interaction, query }) {
+  async execute ({ interaction, query, searchType }) {
     /*
      * get() já devolve null e agenda a destruição de um player
      * inconsistente. Isso é síncrono, então a validação de canal
@@ -63,7 +63,7 @@ export default class PlayRequestService {
        */
       player = await this.playerManager.reconcile(interaction.guildId)
 
-      const result = await this.searchService.search(query)
+      const result = await this.searchService.search(query, searchType)
 
       if (
         result.type === 'empty' ||

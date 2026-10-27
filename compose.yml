@@ -38,6 +38,31 @@ services:
 
     logging: *default-logging
 
+  yt-cipher:
+    image: ghcr.io/kikkia/yt-cipher:master
+
+    restart: unless-stopped
+
+    environment:
+      API_TOKEN: "${YT_CIPHER_TOKEN}"
+
+      # Variante recomendada pelo próprio yt-cipher para
+      # manter a descriptografia estável.
+      OVERRIDE_PLAYER_VARIANT: "IAS"
+
+      # Evita um worker Deno por núcleo da máquina.
+      MAX_THREADS: "1"
+
+    expose:
+      - "8001"
+
+    mem_limit: 256m
+
+    networks:
+      - lucio-network
+
+    logging: *default-logging
+
   lavalink:
     image: ghcr.io/lavalink-devs/lavalink:4.2.2-alpine
 
@@ -48,6 +73,11 @@ services:
 
       LAVALINK_PASSWORD: "${LAVALINK_PASSWORD}"
       YOUTUBE_OAUTH_REFRESH_TOKEN: "${YOUTUBE_OAUTH_REFRESH_TOKEN}"
+      YT_CIPHER_TOKEN: "${YT_CIPHER_TOKEN}"
+
+    depends_on:
+      yt-cipher:
+        condition: service_started
 
     volumes:
       - ./application.yml:/opt/Lavalink/application.yml:ro

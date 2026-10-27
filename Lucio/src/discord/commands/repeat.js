@@ -1,4 +1,4 @@
-import { MessageFlags, SlashCommandBuilder } from 'discord.js'
+import { MessageFlags, InteractionContextType, SlashCommandBuilder } from 'discord.js'
 
 import { RepeatMode } from '../../music/player/RepeatMode.js'
 
@@ -7,6 +7,7 @@ import VoiceChannelValidator from '../../voice/VoiceChannelValidator.js'
 export const data = new SlashCommandBuilder()
   .setName('repeat')
   .setDescription('Altera o modo de repetição.')
+  .setContexts(InteractionContextType.Guild)
   .addStringOption(option =>
     option
       .setName('mode')

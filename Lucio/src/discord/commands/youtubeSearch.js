@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from 'discord.js'
+import { InteractionContextType, SlashCommandBuilder } from 'discord.js'
 
 import { SearchType } from '../../music/search/SearchType.js'
 
@@ -11,6 +11,7 @@ const commandLogger = logger.child({
 export const data = new SlashCommandBuilder()
   .setName('yt')
   .setDescription('Busca vídeos ou playlists no YouTube.')
+  .setContexts(InteractionContextType.Guild)
   .addStringOption(option =>
     option
       .setName('tipo')
@@ -101,15 +102,20 @@ export async function autocomplete (interaction, { autocompleteService }) {
 }
 
 export async function execute (interaction, { playRequestService }) {
-  /*
-   * O autocomplete já retorna uma URL
-   * exata de vídeo ou playlist.
-   */
   const query = interaction.options.getString('busca', true)
 
+  const searchType = interaction.options.getString('tipo', true)
+
+  /*
+   * Quando o usuário escolhe um item do autocomplete, query já
+   * é a URL exata. Quando ele digita e aperta Enter, o
+   * searchType garante que uma busca de playlist não caia no
+   * ytsearch de vídeo.
+   */
   await playRequestService.execute({
     interaction,
-    query
+    query,
+    searchType
   })
 }
 

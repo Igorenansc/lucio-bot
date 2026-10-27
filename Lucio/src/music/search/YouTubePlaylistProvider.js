@@ -1,4 +1,4 @@
-import { Innertube } from 'youtubei.js'
+import { getYouTubeClient } from './YouTubeClient.js'
 
 export default class YouTubePlaylistProvider {
   constructor (youtube) {
@@ -6,7 +6,7 @@ export default class YouTubePlaylistProvider {
   }
 
   static async create () {
-    const youtube = await Innertube.create()
+    const youtube = await getYouTubeClient()
 
     return new YouTubePlaylistProvider(youtube)
   }

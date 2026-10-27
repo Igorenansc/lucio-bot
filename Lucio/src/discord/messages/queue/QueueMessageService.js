@@ -29,22 +29,7 @@ export default class QueueMessageService {
 
     const visible = tracks.slice(start, end)
 
-    const queueText =
-      visible.length === 0
-        ? ':cricket:‎ ‎ ‎:cricket::cricket:‎ ‎:cricket:'
-        : visible
-            .map((track, index) => {
-              const position = start + index + 1
-
-              const duration = track.info.isStream
-                ? 'AO VIVO'
-                : formatDuration(track.info.length)
-
-              return (
-                `**${position} - ** ` + `${track.info.title} - [${duration}]`
-              )
-            })
-            .join('\n')
+    const queueText = this.#buildQueueText(visible, start)
 
     const embed = new EmbedBuilder().setColor(3066993).addFields(
       {
@@ -132,6 +117,42 @@ export default class QueueMessageService {
       embeds: [embed],
       components: [row, selectRow]
     }
+  }
+
+  #buildQueueText (tracks, start) {
+    if (tracks.length === 0) {
+      return ':cricket:‎ ‎ ‎:cricket::cricket:‎ ‎:cricket:'
+    }
+
+    /*
+     * O Discord limita field.value a 1024 caracteres.
+     * Mantemos margem para não derrubar a interação com
+     * títulos longos ou markdown inesperado.
+     */
+    const maxLength = 1000
+
+    const lines = []
+
+    for (const [index, track] of tracks.entries()) {
+      const position = start + index + 1
+
+      const duration = track.info.isStream
+        ? 'AO VIVO'
+        : formatDuration(track.info.length ?? 0)
+
+      const line = `**${position} - ** ${track.info.title} - [${duration}]`
+
+      const nextLength = [...lines, line].join('\n').length
+
+      if (nextLength > maxLength) {
+        lines.push('...')
+        break
+      }
+
+      lines.push(line)
+    }
+
+    return lines.join('\n')
   }
 
   #generateProgressBar (player) {

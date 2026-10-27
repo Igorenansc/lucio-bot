@@ -248,7 +248,7 @@ describe('Comandos de controle', () => {
 
     assert.deepEqual(playerManager.calls.get, ['guild-1'])
 
-    assert.equal(playerManager.calls.destroy.length, 0)
+    assert.deepEqual(playerManager.calls.destroy, ['guild-1'])
 
     assert.equal(
       calls.reply[0].content,

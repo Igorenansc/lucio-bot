@@ -1,13 +1,31 @@
 import LavalinkNodeResolver from '../playback/LavaLinkNodeResolver.js'
 
+import { SearchType } from './SearchType.js'
+
 export default class SearchService {
-  constructor (shoukaku, youtubePlaylistProvider) {
+  constructor (
+    shoukaku,
+    youtubePlaylistProvider,
+    youtubeSearchProvider = null
+  ) {
     this.shoukaku = shoukaku
 
     this.youtubePlaylistProvider = youtubePlaylistProvider
+
+    this.youtubeSearchProvider = youtubeSearchProvider
   }
 
-  async search (query) {
+  async search (query, type = SearchType.VIDEO) {
+    /*
+     * Playlist por texto não existe no ytsearch do Lavalink.
+     * Para esse caso usamos a busca de playlists do youtubei
+     * e resolvemos o primeiro resultado, mantendo a semântica
+     * do /yt com tipo=playlist.
+     */
+    if (type === SearchType.PLAYLIST && !this.#isUrl(query)) {
+      return await this.#searchPlaylistByQuery(query)
+    }
+
     const node = new LavalinkNodeResolver(this.shoukaku).getAvailableNode()
 
     const identifier = this.#isUrl(query) ? query : `ytsearch:${query}`
@@ -22,6 +40,38 @@ export default class SearchService {
     }
 
     return this.#normalizeResult(result)
+  }
+
+  async #searchPlaylistByQuery (query) {
+    if (!this.youtubeSearchProvider || !this.youtubePlaylistProvider) {
+      return this.#empty()
+    }
+
+    const results = await this.youtubeSearchProvider.search(
+      query,
+      SearchType.PLAYLIST,
+      1
+    )
+
+    const playlistId = results[0]?.playlistId
+
+    if (!playlistId) return this.#empty()
+
+    const playlist = await this.youtubePlaylistProvider.getPlaylist(playlistId)
+
+    if (!playlist || playlist.tracks.length === 0) {
+      return this.#empty()
+    }
+
+    return playlist
+  }
+
+  #empty () {
+    return {
+      type: 'empty',
+      tracks: [],
+      playlist: null
+    }
   }
 
   #isYoutubePlaylistUrl (value) {
@@ -49,16 +99,14 @@ export default class SearchService {
   }
 
   async #resolveYoutubePlaylist (url) {
+    if (!this.youtubePlaylistProvider) return this.#empty()
+
     const playlistId = new URL(url).searchParams.get('list')
 
     const playlist = await this.youtubePlaylistProvider.getPlaylist(playlistId)
 
     if (!playlist || playlist.tracks.length === 0) {
-      return {
-        type: 'empty',
-        tracks: [],
-        playlist: null
-      }
+      return this.#empty()
     }
 
     return playlist

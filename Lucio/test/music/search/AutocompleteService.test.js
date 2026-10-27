@@ -202,4 +202,32 @@ describe('AutocompleteService', () => {
 
     assert.equal(playlist[0].type, SearchType.PLAYLIST)
   })
+
+  test('sem provider retorna lista vazia', async () => {
+    const service = new AutocompleteService(null, {
+      debounceMs: 0
+    })
+
+    const result = await service.search('key', 'query')
+
+    assert.deepEqual(result, [])
+  })
+
+  test('aborta quando o provider passa do timeout', async () => {
+    const provider = {
+      search () {
+        return new Promise(() => {})
+      }
+    }
+
+    const service = new AutocompleteService(provider, {
+      debounceMs: 0,
+      timeoutMs: 20
+    })
+
+    await assert.rejects(
+      () => service.search('key', 'query'),
+      /Timeout na busca de autocomplete/
+    )
+  })
 })

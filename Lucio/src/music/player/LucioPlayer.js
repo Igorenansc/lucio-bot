@@ -7,7 +7,16 @@ import { RepeatMode } from './RepeatMode.js'
 import { logger } from '../../app/config/logger.js'
 
 export default class LucioPlayer extends EventEmitter {
-  constructor (shoukakuPlayer, recommendationService, trackResolver) {
+  constructor (
+    shoukakuPlayer,
+    recommendationService,
+    trackResolver,
+    {
+      initialVolume = 10,
+      historyLimit = 50,
+      startTimeoutMs = 10_000
+    } = {}
+  ) {
     super()
 
     this.engine = shoukakuPlayer
@@ -18,15 +27,41 @@ export default class LucioPlayer extends EventEmitter {
 
     this.history = []
 
+    this.historyLimit = historyLimit
+
     this.logger = logger.child({
       component: 'LucioPlayer',
       guildId: shoukakuPlayer.guildId
     })
 
+    /*
+     * currentTrack é a faixa que o Lavalink confirmou.
+     *
+     * pendingTrack é a faixa já enviada ao engine, mas que
+     * ainda não recebeu o evento "start". Ela permite atualizar
+     * o painel na hora sem mentir sobre o estado confirmado.
+     */
     this.currentTrack = null
 
-    this.volume = 10
-    this.engine.setGlobalVolume(this.volume)
+    this.pendingTrack = null
+
+    this.expectedTrackKey = null
+
+    this.startedTrackKey = null
+
+    this.startTimer = null
+
+    this.transitionId = 0
+
+    this.startTimeoutMs = startTimeoutMs
+
+    this.volume = initialVolume
+    this.engine.setGlobalVolume(this.volume).catch(error => {
+      this.logger.warn(
+        { err: error, volume: this.volume },
+        'Falha ao definir volume inicial'
+      )
+    })
 
     this.paused = false
 
@@ -51,7 +86,48 @@ export default class LucioPlayer extends EventEmitter {
 
   #registerEngineEvents () {
     this.engine.on('start', data => {
+      const trackKey = this.#getTrackKey(data.track)
+
+      /*
+       * Start depois de stop/idle não deve ressuscitar o
+       * player.
+       */
+      if (!this.expectedTrackKey) {
+        this.logger.debug(
+          { trackId: trackKey },
+          'Start ignorado sem transição ativa'
+        )
+
+        return
+      }
+
+      /*
+       * Um start atrasado de uma track antiga não pode
+       * sobrescrever a track que já está em transição.
+       */
+      if (
+        this.expectedTrackKey &&
+        trackKey &&
+        this.expectedTrackKey !== trackKey
+      ) {
+        this.logger.warn(
+          {
+            expected: this.expectedTrackKey,
+            received: trackKey
+          },
+          'Start de track antiga ignorado'
+        )
+
+        return
+      }
+
       this.currentTrack = data.track
+
+      this.pendingTrack = null
+
+      this.startedTrackKey = trackKey
+
+      this.#clearStartTimer()
 
       this.paused = false
 
@@ -81,35 +157,77 @@ export default class LucioPlayer extends EventEmitter {
 
       this.logger.debug(
         {
-          trackId: data.track.info.identifier,
+          trackId: data.track?.info?.identifier,
           reason: data.reason
         },
         'Track finalizada'
       )
 
       /*
-       * Falhas são tratadas pelos
-       * eventos exception/stuck.
+       * Já existe uma nova faixa sendo iniciada.
        *
-       * Assim evitamos processar
-       * duas vezes a mesma faixa.
+       * Este end pertence à faixa anterior (skip, previous,
+       * repeat ou troca de faixa) e não deve avançar a fila
+       * outra vez.
        */
+      if (this.pendingTrack) {
+        this.logger.debug(
+          { reason: data.reason },
+          'End ignorado: há uma track em transição'
+        )
+
+        return
+      }
+
+      /*
+       * loadFailed não gera TrackExceptionEvent necessariamente.
+       * Se fosse ignorado, a faixa ficaria registrada como atual
+       * sem nunca ter tocado.
+       */
+      if (data.reason === 'loadFailed') {
+        try {
+          await this.#handlePlaybackFailure(
+            data.track ?? this.currentTrack,
+            'loadFailed'
+          )
+        } catch (error) {
+          await this.#handleRecoveryError(
+            error,
+            data.track ?? this.currentTrack
+          )
+        }
+
+        return
+      }
+
       if (data.reason !== 'finished') {
+        return
+      }
+
+      const endedKey = this.#getTrackKey(data.track)
+
+      const currentKey = this.#getTrackKey(this.currentTrack)
+
+      /*
+       * Um end atrasado da track anterior pode chegar depois
+       * de uma nova track já ter sido confirmada.
+       */
+      if (endedKey && currentKey && endedKey !== currentKey) {
+        this.logger.debug(
+          {
+            ended: endedKey,
+            current: currentKey
+          },
+          'End de track antiga ignorado'
+        )
+
         return
       }
 
       try {
         await this.#handleTrackFinished(data.track)
       } catch (error) {
-        this.emit('playbackError', error)
-
-        this.logger.error(
-          {
-            err: error,
-            trackId: data.track?.info?.identifier
-          },
-          'Erro ao processar fim da track'
-        )
+        await this.#handleTrackEndError(error, data.track)
       }
     })
 
@@ -191,17 +309,88 @@ export default class LucioPlayer extends EventEmitter {
       throw new Error(`Track não pôde ser resolvida: ${track.info.title}`)
     }
 
+    const trackKey = this.#getTrackKey(resolvedTrack)
+
+    const transitionId = ++this.transitionId
+
+    this.#clearStartTimer()
+
+    this.pendingTrack = resolvedTrack
+
+    this.expectedTrackKey = trackKey
+
+    this.startedTrackKey = null
+
+    /*
+     * A UI pode mostrar "Carregando..." imediatamente.
+     * currentTrack só é confirmado depois do playTrack
+     * ser aceito e, idealmente, depois do evento start.
+     */
+    this.emit('trackLoading', resolvedTrack)
+
+    try {
+      await this.engine.playTrack({
+        track: {
+          encoded: resolvedTrack.encoded
+        }
+      })
+    } catch (error) {
+      if (this.transitionId !== transitionId) {
+        this.logger.debug(
+          { err: error, trackId: trackKey },
+          'Falha de playTrack de transição antiga ignorada'
+        )
+
+        return
+      }
+
+      this.pendingTrack = null
+
+      this.expectedTrackKey = null
+
+      this.startedTrackKey = null
+
+      this.#clearStartTimer()
+
+      /*
+       * O painel pode estar mostrando "Carregando...".
+       * Se existe faixa anterior, volta para ela; se não,
+       * entra em idle e remove o painel.
+       */
+      if (this.currentTrack) {
+        this.#stateChanged('track')
+      } else {
+        this.#setIdle(null)
+      }
+
+      throw error
+    }
+
+    /*
+     * Uma nova transição começou enquanto este playTrack
+     * ainda estava em andamento. Não sobrescreve o estado
+     * da transição mais nova.
+     */
+    if (this.transitionId !== transitionId) return
+
+    /*
+     * O playTrack foi aceito. currentTrack já pode ser
+     * exibido, mas o start ainda pode demorar; o timer
+     * abaixo cobre esse caso.
+     */
     this.currentTrack = resolvedTrack
 
-    await this.engine.playTrack({
-      track: {
-        encoded: resolvedTrack.encoded
-      }
-    })
+    this.pendingTrack = null
+
+    this.#stateChanged('track')
+
+    if (this.startedTrackKey !== trackKey) {
+      this.#armStartTimer(trackKey)
+    }
   }
 
   async enqueue (track) {
-    if (!this.currentTrack) {
+    if (!this.currentTrack && !this.pendingTrack) {
       await this.play(track)
 
       return
@@ -219,7 +408,7 @@ export default class LucioPlayer extends EventEmitter {
 
     let queueStartIndex = 0
 
-    if (!this.currentTrack) {
+    if (!this.currentTrack && !this.pendingTrack) {
       await this.play(pendingTracks[0])
       queueStartIndex = 1
     }
@@ -268,9 +457,8 @@ export default class LucioPlayer extends EventEmitter {
   }
 
   async setVolume (volume) {
-    const normalized = Math.max(0, Math.min(100, volume))
+    this.volume = Math.max(0, Math.min(100, volume))
 
-    this.volume = normalized >= 0 ? normalized : 1
     await this.engine.setGlobalVolume(this.volume)
 
     this.#stateChanged('volume')
@@ -293,11 +481,21 @@ export default class LucioPlayer extends EventEmitter {
   }
 
   async stop () {
+    this.transitionId++
+
     this.queue.clear()
 
     this.history.length = 0
 
     this.currentTrack = null
+
+    this.pendingTrack = null
+
+    this.expectedTrackKey = null
+
+    this.startedTrackKey = null
+
+    this.#clearStartTimer()
 
     this.paused = false
 
@@ -309,7 +507,17 @@ export default class LucioPlayer extends EventEmitter {
   }
 
   #setIdle (previousTrack = this.currentTrack) {
+    this.transitionId++
+
     this.currentTrack = null
+
+    this.pendingTrack = null
+
+    this.expectedTrackKey = null
+
+    this.startedTrackKey = null
+
+    this.#clearStartTimer()
 
     this.paused = false
 
@@ -325,7 +533,7 @@ export default class LucioPlayer extends EventEmitter {
       return
     }
 
-    this.history.push(track)
+    this.#pushHistory(track)
 
     if (this.repeatMode === RepeatMode.QUEUE) this.queue.add(track)
 
@@ -356,9 +564,45 @@ export default class LucioPlayer extends EventEmitter {
      * foi parado, um evento atrasado não
      * deve iniciar uma nova recuperação.
      */
-    if (!failedTrack || !this.currentTrack) return
+    if (!failedTrack) return
 
     const failedKey = this.#getTrackKey(failedTrack)
+
+    /*
+     * A falha pode ser da faixa que ainda está em
+     * transição. Nesse caso ela vira a referência e
+     * limpamos o estado pendente antes de recuperar.
+     */
+    if (this.pendingTrack) {
+      const pendingKey = this.#getTrackKey(this.pendingTrack)
+
+      if (failedKey && pendingKey && failedKey !== pendingKey) {
+        this.logger.debug(
+          {
+            failedTrack: failedKey,
+            pendingTrack: pendingKey,
+            reason
+          },
+          'Evento de falha de track antiga ignorado'
+        )
+
+        return
+      }
+
+      if (failedKey === pendingKey) {
+        this.currentTrack = this.pendingTrack
+
+        this.pendingTrack = null
+
+        this.expectedTrackKey = null
+
+        this.startedTrackKey = null
+
+        this.#clearStartTimer()
+      }
+    }
+
+    if (!this.currentTrack) return
 
     const currentKey = this.#getTrackKey(this.currentTrack)
 
@@ -399,7 +643,7 @@ export default class LucioPlayer extends EventEmitter {
      * Isso também impede que o autoplay
      * recomende imediatamente a mesma faixa.
      */
-    this.history.push(failedTrack)
+    this.#pushHistory(failedTrack)
 
     this.logger.warn(
       {
@@ -442,6 +686,14 @@ export default class LucioPlayer extends EventEmitter {
   async #handleRecoveryError (error, failedTrack) {
     this.recoveringTrackKey = null
 
+    this.pendingTrack = null
+
+    this.expectedTrackKey = null
+
+    this.startedTrackKey = null
+
+    this.#clearStartTimer()
+
     this.emit('playbackError', error)
 
     this.logger.error(
@@ -468,6 +720,105 @@ export default class LucioPlayer extends EventEmitter {
     }
 
     this.#setIdle(failedTrack)
+  }
+
+  async #handleTrackEndError (error, failedTrack) {
+    this.pendingTrack = null
+
+    this.expectedTrackKey = null
+
+    this.startedTrackKey = null
+
+    this.#clearStartTimer()
+
+    this.logger.error(
+      {
+        err: error,
+        trackId: failedTrack?.info?.identifier
+      },
+      'Erro ao processar fim da track'
+    )
+
+    this.emit('playbackError', error)
+
+    try {
+      await this.engine.stopTrack()
+    } catch (stopError) {
+      this.logger.error(
+        { err: stopError },
+        'Falha ao parar engine após erro de fim de track'
+      )
+    }
+
+    this.#setIdle(failedTrack ?? this.currentTrack)
+  }
+
+  #armStartTimer (trackKey) {
+    this.#clearStartTimer()
+
+    this.startTimer = setTimeout(() => {
+      this.startTimer = null
+
+      void this.#handleStartTimeout(trackKey)
+    }, this.startTimeoutMs)
+
+    this.startTimer.unref?.()
+  }
+
+  #clearStartTimer () {
+    if (!this.startTimer) return
+
+    clearTimeout(this.startTimer)
+
+    this.startTimer = null
+  }
+
+  async #handleStartTimeout (trackKey) {
+    if (this.startedTrackKey === trackKey) return
+
+    if (this.expectedTrackKey !== trackKey) return
+
+    const track = this.currentTrack ?? this.pendingTrack
+
+    this.expectedTrackKey = null
+
+    this.startedTrackKey = null
+
+    this.pendingTrack = null
+
+    this.#clearStartTimer()
+
+    const error = new Error(
+      `Timeout aguardando o início da track ${trackKey ?? 'desconhecida'}.`
+    )
+
+    this.logger.warn({ trackId: trackKey }, 'Timeout aguardando início da track')
+
+    if (!track) {
+      this.emit('playbackError', error)
+
+      this.#setIdle(track)
+
+      return
+    }
+
+    this.emit('playbackError', error)
+
+    try {
+      await this.#handlePlaybackFailure(track, 'start-timeout')
+    } catch (recoveryError) {
+      await this.#handleRecoveryError(recoveryError, track)
+    }
+  }
+
+  #pushHistory (track) {
+    if (!track) return
+
+    this.history.push(track)
+
+    if (this.history.length <= this.historyLimit) return
+
+    this.history.splice(0, this.history.length - this.historyLimit)
   }
 
   #getTrackKey (track) {
@@ -510,7 +861,7 @@ export default class LucioPlayer extends EventEmitter {
 
     let lastSkippedTrack = skippedTrack
 
-    this.history.push(skippedTrack)
+    this.#pushHistory(skippedTrack)
 
     /*
      * A faixa atual já conta como a primeira.
@@ -523,7 +874,7 @@ export default class LucioPlayer extends EventEmitter {
 
       if (!queuedTrack) break
 
-      this.history.push(queuedTrack)
+      this.#pushHistory(queuedTrack)
 
       lastSkippedTrack = queuedTrack
     }
@@ -538,7 +889,13 @@ export default class LucioPlayer extends EventEmitter {
       return false
     }
 
-    await this.play(nextTrack)
+    try {
+      await this.play(nextTrack)
+    } catch (error) {
+      await this.#handleRecoveryError(error, lastSkippedTrack)
+
+      return false
+    }
 
     return true
   }
@@ -564,7 +921,13 @@ export default class LucioPlayer extends EventEmitter {
      */
     if (this.currentTrack) this.queue.addNext(this.currentTrack)
 
-    await this.play(previousTrack)
+    try {
+      await this.play(previousTrack)
+    } catch (error) {
+      await this.#handleRecoveryError(error, previousTrack)
+
+      return false
+    }
 
     return true
   }

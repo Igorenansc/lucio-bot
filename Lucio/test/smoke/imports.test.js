@@ -49,6 +49,10 @@ const modules = [
   '../../src/music/player/PlayerManager.js',
   '../../src/music/player/RepeatMode.js',
 
+  '../../src/music/settings/GuildSettingsService.js',
+
+  '../../src/music/search/YouTubeClient.js',
+
   '../../src/music/search/SearchService.js',
   '../../src/music/search/AutocompleteService.js',
   '../../src/music/search/YouTubeSearchProvider.js',

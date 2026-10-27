@@ -35,6 +35,7 @@ plugins:
     clients:
       - WEB
       - WEBEMBEDDED
+      - ANDROID_VR
       - TV
 
     oauth:
@@ -42,6 +43,6 @@ plugins:
       refreshToken: "${YOUTUBE_OAUTH_REFRESH_TOKEN}"
 
     remoteCipher:
-      url: "https://cipher.kikkia.dev/"
-      # password: "${YT_CIPHER_TOKEN}"
+      url: "http://yt-cipher:8001"
+      password: "${YT_CIPHER_TOKEN}"
       userAgent: "Lucio"

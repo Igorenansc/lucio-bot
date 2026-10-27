@@ -36,6 +36,27 @@ function registerShoukakuEvents(shoukaku) {
             "Erro no node"
         );
     });
+
+    shoukaku.on("disconnect", (name, count) => {
+        lavalinkLogger.warn(
+            {
+                node: name,
+                count,
+            },
+            "Node desconectado"
+        );
+    });
+
+    shoukaku.on("reconnecting", (name, reconnectsLeft, reconnectInterval) => {
+        lavalinkLogger.warn(
+            {
+                node: name,
+                reconnectsLeft,
+                reconnectInterval,
+            },
+            "Reconectando node"
+        );
+    });
 }
 
 
@@ -64,6 +85,17 @@ function registerDiscordEvents({
         }
     });
 
+
+    client.on("error", error => {
+        discordLogger.error(
+            { err: error },
+            "Erro no client Discord"
+        );
+    });
+
+    client.on("warn", message => {
+        discordLogger.warn({ message }, "Aviso do client Discord");
+    });
 
     client.on("interactionCreate", async interaction => {
         try {
@@ -102,7 +134,27 @@ async function handleInteractionError(interaction, error) {
 
     if (interaction.isAutocomplete()) return;
 
-    if (interaction.deferred || interaction.replied) return;
+    /*
+     * Se a interação já foi reconhecida (deferReply/deferUpdate),
+     * editReply em componente pode não ser o canal certo. Um
+     * followUp efêmero garante que o usuário veja o erro em vez
+     * de ficar com um botão "morto".
+     */
+    if (interaction.deferred || interaction.replied) {
+        try {
+            await interaction.followUp({
+                content: "Ocorreu um erro ao executar esta ação.",
+                flags: MessageFlags.Ephemeral,
+            });
+        } catch (followUpError) {
+            discordLogger.error(
+                { err: followUpError },
+                "Não foi possível responder ao erro da interação"
+            );
+        }
+
+        return;
+    }
 
     try {
         await interaction.reply({

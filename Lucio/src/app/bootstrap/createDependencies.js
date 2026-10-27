@@ -18,10 +18,12 @@ import QueueMessageHandler from '../../discord/messages/queue/QueueMessageHandle
 import InteractionRouter from '../../discord/interactions/InteractionRouter.js'
 
 import PlayerManager from '../../music/player/PlayerManager.js'
+import GuildSettingsService from '../../music/settings/GuildSettingsService.js'
 
 import YouTubeRecommendationProvider from '../../music/recommendation/YouTubeRecommendationProvider.js'
 
 import YouTubeSearchProvider from '../../music/search/YouTubeSearchProvider.js'
+import { getYouTubeClient } from '../../music/search/YouTubeClient.js'
 import AutocompleteService from '../../music/search/AutocompleteService.js'
 
 import YouTubePlaylistProvider from '../../music/search/YouTubePlaylistProvider.js'
@@ -54,25 +56,60 @@ export async function createDependencies () {
     config.lavalink.options
   )
 
+  const validOwners = config.owners.filter(id => /^\d{17,20}$/.test(id))
+
+  if (validOwners.length !== config.owners.length) {
+    bootstrapLogger.warn(
+      {
+        invalid: config.owners.length - validOwners.length
+      },
+      'OWNERS_ID contém IDs inválidos; eles serão ignorados.'
+    )
+  }
+
   const ownerService = new OwnerService({
-    owners: config.owners
+    owners: validOwners
   })
 
-  if (config.owners.length === 0) {
+  if (validOwners.length === 0) {
     bootstrapLogger.warn(
       'OWNERS_ID não configurado; comandos de dono ficarão indisponíveis.'
     )
   } else {
     bootstrapLogger.info(
-      { count: config.owners.length },
+      { count: validOwners.length },
       'Owners configurados'
     )
   }
 
   // Providers
-  const youtubeProvider = await YouTubeRecommendationProvider.create()
-  const youtubeSearchProvider = await YouTubeSearchProvider.create()
-  const youtubePlaylistProvider = await YouTubePlaylistProvider.create()
+  /*
+   * Uma única instância de Innertube para search, playlist e
+   * recommendation. Se ela falhar no boot, o /p (Lavalink)
+   * continua funcionando; /yt e autoplay degradam.
+   */
+  let youtubeClient = null
+
+  try {
+    youtubeClient = await getYouTubeClient()
+  } catch (error) {
+    bootstrapLogger.warn(
+      { err: error },
+      'YouTube client indisponível; /yt e autoplay ficarão limitados.'
+    )
+  }
+
+  const youtubeProvider = youtubeClient
+    ? new YouTubeRecommendationProvider(youtubeClient)
+    : null
+
+  const youtubeSearchProvider = youtubeClient
+    ? new YouTubeSearchProvider(youtubeClient)
+    : null
+
+  const youtubePlaylistProvider = youtubeClient
+    ? new YouTubePlaylistProvider(youtubeClient)
+    : null
 
   const trackResolver = new TrackResolver(shoukaku)
 
@@ -82,7 +119,11 @@ export async function createDependencies () {
     config.autocomplete
   )
 
-  const searchService = new SearchService(shoukaku, youtubePlaylistProvider)
+  const searchService = new SearchService(
+    shoukaku,
+    youtubePlaylistProvider,
+    youtubeSearchProvider
+  )
   const queueMessageService = new QueueMessageService()
   const playerMessageService = new PlayerMessageService()
 
@@ -90,6 +131,10 @@ export async function createDependencies () {
   const playerMessageController = new PlayerMessageController(
     playerMessageService
   )
+
+  const guildSettings = new GuildSettingsService({
+    defaultVolume: config.player.defaultVolume
+  })
 
   // Player
   const playerManager = new PlayerManager(
@@ -99,7 +144,12 @@ export async function createDependencies () {
     trackResolver,
     {
       voiceCloseGraceMs: config.voice.closeGraceMs,
-      watchdogIntervalMs: config.voice.watchdogIntervalMs
+      watchdogIntervalMs: config.voice.watchdogIntervalMs,
+      historyLimit: config.player.historyLimit,
+      startTimeoutMs: config.player.startTimeoutMs,
+      teardownTimeoutMs: config.player.teardownTimeoutMs,
+      nodeDownGraceMs: config.player.nodeDownGraceMs,
+      guildSettings
     }
   )
 

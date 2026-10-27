@@ -1,12 +1,15 @@
 {
   "name": "Lucio",
   "version": "1.0.0",
-  "description": "",
+  "description": "Discord music bot powered by Lavalink and youtubei.js",
   "main": "index.js",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "start": "node index.js",
     "test": "NODE_ENV=test LOG_LEVEL=silent DISCORD_TOKEN=test CLIENT_ID=test LAVALINK_URL=localhost:2333 LAVALINK_PASSWORD=test node --test",
-    "test:watch": "node --test --watch"
+    "test:watch": "NODE_ENV=test LOG_LEVEL=silent DISCORD_TOKEN=test CLIENT_ID=test LAVALINK_URL=localhost:2333 LAVALINK_PASSWORD=test node --test --watch"
   },
   "keywords": [],
   "author": "",

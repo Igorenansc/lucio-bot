@@ -1,5 +1,6 @@
 import LucioPlayer from './LucioPlayer.js'
 import RecommendationService from '../recommendation/RecommendationService.js'
+import GuildSettingsService from '../settings/GuildSettingsService.js'
 
 import { logger } from '../../app/config/logger.js'
 
@@ -11,7 +12,12 @@ export default class PlayerManager {
     trackResolver,
     {
       voiceCloseGraceMs = 1_500,
-      watchdogIntervalMs = 30_000
+      watchdogIntervalMs = 30_000,
+      historyLimit = 50,
+      startTimeoutMs = 10_000,
+      teardownTimeoutMs = 12_000,
+      nodeDownGraceMs = 60_000,
+      guildSettings = new GuildSettingsService()
     } = {}
   ) {
     this.shoukaku = shoukaku
@@ -25,6 +31,16 @@ export default class PlayerManager {
     this.voiceCloseGraceMs = voiceCloseGraceMs
 
     this.watchdogIntervalMs = watchdogIntervalMs
+
+    this.historyLimit = historyLimit
+
+    this.startTimeoutMs = startTimeoutMs
+
+    this.teardownTimeoutMs = teardownTimeoutMs
+
+    this.nodeDownGraceMs = nodeDownGraceMs
+
+    this.guildSettings = guildSettings
 
     this.logger = logger.child({
       component: 'PlayerManager'
@@ -42,6 +58,8 @@ export default class PlayerManager {
     this.operations = new Map()
 
     this.closedTimers = new Map()
+
+    this.nodeDownSince = new Map()
 
     this.watchdog = null
   }
@@ -190,6 +208,24 @@ export default class PlayerManager {
     this.watchdog = null
   }
 
+  async destroyAll (reason = 'shutdown') {
+    const guildIds = new Set([
+      ...this.players.keys(),
+      ...(this.shoukaku.connections?.keys() ?? [])
+    ])
+
+    for (const guildId of guildIds) {
+      try {
+        await this.destroy(guildId, reason)
+      } catch (error) {
+        this.logger.error(
+          { err: error, guildId, reason },
+          'Falha ao destruir player no shutdown'
+        )
+      }
+    }
+  }
+
   async sweep () {
     const guildIds = new Set([
       ...this.players.keys(),
@@ -198,6 +234,24 @@ export default class PlayerManager {
 
     for (const guildId of guildIds) {
       try {
+        const player = this.players.get(guildId)
+
+        if (player && !this.#isNodeAvailable(player)) {
+          const downSince = this.nodeDownSince.get(guildId) ?? Date.now()
+
+          this.nodeDownSince.set(guildId, downSince)
+
+          if (Date.now() - downSince >= this.nodeDownGraceMs) {
+            this.nodeDownSince.delete(guildId)
+
+            await this.destroy(guildId, 'node-down')
+
+            continue
+          }
+        } else {
+          this.nodeDownSince.delete(guildId)
+        }
+
         await this.reconcile(guildId)
       } catch (error) {
         this.logger.error(
@@ -209,6 +263,18 @@ export default class PlayerManager {
         )
       }
     }
+  }
+
+  #isNodeAvailable (player) {
+    const state = player.engine?.node?.state
+
+    /*
+     * Mocks/test doubles podem não expor node.state.
+     * Nesse caso não bloqueamos o reconcile normal.
+     */
+    if (typeof state !== 'number') return true
+
+    return state === 1
   }
 
   async #create ({ guildId, channelId, textChannel, shardId }) {
@@ -224,10 +290,17 @@ export default class PlayerManager {
       this.youtubeProvider
     )
 
+    const settings = this.guildSettings.get(guildId)
+
     const player = new LucioPlayer(
       engine,
       recommendationService,
-      this.trackResolver
+      this.trackResolver,
+      {
+        initialVolume: settings.volume,
+        historyLimit: this.historyLimit,
+        startTimeoutMs: this.startTimeoutMs
+      }
     )
 
     /*
@@ -236,6 +309,12 @@ export default class PlayerManager {
      */
     player.voiceChannelId =
       this.shoukaku.connections.get(guildId)?.channelId ?? channelId
+
+    player.on('stateChange', event => {
+      if (event.type !== 'volume') return
+
+      this.guildSettings.setVolume(guildId, player.volume)
+    })
 
     player.on('connectionClosed', data => {
       this.#handleConnectionClosed(guildId, data)
@@ -278,6 +357,8 @@ export default class PlayerManager {
      */
     this.players.delete(guildId)
 
+    this.nodeDownSince.delete(guildId)
+
     this.#clearClosedTimer(guildId)
 
     /*
@@ -319,7 +400,11 @@ export default class PlayerManager {
      * pode impedir a limpeza do estado local.
      */
     try {
-      await player.stop()
+      await this.#withTimeout(
+        player.stop(),
+        this.teardownTimeoutMs,
+        'parar player'
+      )
     } catch (error) {
       this.logger.warn(
         {
@@ -332,7 +417,11 @@ export default class PlayerManager {
     }
 
     try {
-      await this.shoukaku.leaveVoiceChannel(guildId)
+      await this.#withTimeout(
+        this.shoukaku.leaveVoiceChannel(guildId),
+        this.teardownTimeoutMs,
+        'sair do canal'
+      )
     } catch (error) {
       this.logger.warn(
         {
@@ -434,6 +523,22 @@ export default class PlayerManager {
     clearTimeout(timer)
 
     this.closedTimers.delete(guildId)
+  }
+
+  #withTimeout (promise, ms, label) {
+    let timer = null
+
+    const timeout = new Promise((_, reject) => {
+      timer = setTimeout(() => {
+        reject(new Error(`Timeout ao ${label}.`))
+      }, ms)
+
+      timer.unref?.()
+    })
+
+    return Promise.race([promise, timeout]).finally(() => {
+      if (timer) clearTimeout(timer)
+    })
   }
 
   #runExclusive (guildId, operation) {

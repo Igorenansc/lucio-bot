@@ -1,4 +1,4 @@
-import { Innertube } from 'youtubei.js'
+import { getYouTubeClient } from '../search/YouTubeClient.js'
 
 export default class YouTubeRecommendationProvider {
   constructor (youtube) {
@@ -6,7 +6,7 @@ export default class YouTubeRecommendationProvider {
   }
 
   static async create () {
-    const youtube = await Innertube.create()
+    const youtube = await getYouTubeClient()
 
     return new YouTubeRecommendationProvider(youtube)
   }

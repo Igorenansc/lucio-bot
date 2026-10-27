@@ -47,6 +47,25 @@ describe('/yt', () => {
     assert.equal(playRequestService.calls[0].query, url)
 
     assert.equal(playRequestService.calls[0].interaction, interaction)
+
+    assert.equal(playRequestService.calls[0].searchType, SearchType.VIDEO)
+  })
+
+  test('encaminha tipo playlist para busca por texto', async () => {
+    const { interaction } = createCommandInteraction({
+      options: {
+        tipo: SearchType.PLAYLIST,
+        busca: 'daft punk'
+      }
+    })
+
+    const playRequestService = createPlayRequestService()
+
+    await execute(interaction, {
+      playRequestService
+    })
+
+    assert.equal(playRequestService.calls[0].searchType, SearchType.PLAYLIST)
   })
 })
 

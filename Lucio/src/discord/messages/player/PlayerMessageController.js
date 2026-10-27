@@ -42,6 +42,8 @@ export default class PlayerMessageController {
       }
     }
 
+    player.on('trackLoading', update)
+
     player.on('trackStart', update)
 
     player.on('stateChange', update)
@@ -62,6 +64,8 @@ export default class PlayerMessageController {
     const binding = this.bindings.get(guildId)
 
     if (!binding) return
+
+    binding.player.off('trackLoading', binding.update)
 
     binding.player.off('trackStart', binding.update)
 
